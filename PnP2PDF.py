@@ -181,7 +181,7 @@ def merge_sheets_into_pdf(sheets_dirs: list[str], time: str):
     merger = PdfMerger()
     for dir in sheets_dirs:
         merger.append(dir)
-        os.remove(dir)
+        # os.remove(dir) # bug on windows
     merger.write(f"{result_folder}/{time}/result.pdf")
     merger.close()
 
