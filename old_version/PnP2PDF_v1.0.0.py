@@ -2,15 +2,15 @@ import datetime
 import os
 import webbrowser
 
-import subprocess
-import sys
-def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-install("pillow")
-install("pathlib")
-install("img2pdf")
-install("pypdf")
-install("PySimpleGUI")
+# import subprocess
+# import sys
+# def install(package):
+#     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+# install("pillow")
+# install("pathlib")
+# install("img2pdf")
+# install("pypdf")
+# install("PySimpleGUI")
 
 from PIL import Image, ImageDraw
 import img2pdf
