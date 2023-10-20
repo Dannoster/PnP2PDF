@@ -21,7 +21,7 @@ OR
 3. Create folders with the same names like card backs from previous step (except you dont need add `_{back width in mm}_{back height in mm}` at the end of folder name) and place all cards that have corresponding back.
 4. You can also create folder with name `Double Sided` for double sided cards that have no ordinary back, where you should place all sides together. Each pair of files will be printed as one double sided card. Be sure if files are sorted in alphabetical order.
 5. Finally you can add folder named `Single Sided` with cards that doesn't have back and place your cards here.
-6. That is all! Now choose the folder from step 1 as `Cards folder` in `PnP2PDfF` window and enjoy your final result!
+6. That is all! Now choose the folder from step 1 as `Cards folder` in `PnP2PDF` window and enjoy your final result!
 
 The final structure is shown below:
 
