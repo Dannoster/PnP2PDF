@@ -1,7 +1,7 @@
 # PnP2PDF
 [Download MacOS Version](https://drive.google.com/drive/folders/1fADjKJbXosjtHfRhAyEQ-Opt4FbnRdQ7?usp=sharing)
 
-Windows Version will be soon
+[Download Windows Version](https://drive.google.com/drive/folders/1BOEETxM4q-EuxWY9ZJXSHYg7T8a1HAd-?usp=sharing)
 
 OR
 
