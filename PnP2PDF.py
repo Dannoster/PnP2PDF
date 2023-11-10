@@ -6,19 +6,13 @@ import os
 import webbrowser
 import pickle
 import datetime
-
-# import subprocess, sys
-# def install(package): subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-# install("PySimpleGUI")
-# install("pillow")
-# pyinstaller --add-data "color_profiles/sRGB-IEC61966-2.1.icc:color_profiles" --add-data "color_profiles/USWebCoatedSWOP.icc:color_profiles" --onefile --windowed PnP2PDF_v2.0.1.py
-# pyinstaller --add-data "color_profiles/sRGB-IEC61966-2.1.icc:color_profiles" --add-data "color_profiles/USWebCoatedSWOP.icc:color_profiles" --windowed PnP2PDF_v2.0.1.py
-
+# pip install PySimpleGUI
+# pip install pillow
 import PySimpleGUI as sg
 from PIL import Image, ImageDraw, ImageCms
 
-PROGRAM_VERSION = "2.0.1"
-PXLS_IN_MM = 11.81102362204 # need changes
+PROGRAM_VERSION = "2.0.2"
+PXLS_IN_MM = 11.81102362204 # needed changes
 DEFAULT_SETTINGS = {"paper_width"   : 210,
             "paper_height"  : 297,
             "card_width"    : 62.5,
@@ -425,7 +419,7 @@ def ui_window(settings: dict):
     while True:
         event, values = window.read()
         if event == sg.WINDOW_CLOSED:
-            break
+            return "Window closed"
         elif event.startswith("URL "):
             url = event.split(' ')[1]
             webbrowser.open(url)
@@ -456,19 +450,20 @@ def main():
     save_folder = "presets.pickle"
     settings = load_save(save_folder)
     ui_output = ui_window(settings)
-    settings = {"paper_width"   : ui_output['-PWIDTH-'],
-                "paper_height"  : ui_output['-PHEIGHT-'],
-                "card_width"    : ui_output['-CWIDTH-'],
-                "card_height"   : ui_output['-CHEIGHT-'],
-                "resize"        : ui_output['-SIZECHECKBOX-'],
-                "double_sided"  : ui_output['-DOUBLECHECKBOX-'],
-                "rows"          : ui_output['-ROWS-'],
-                "columns"       : ui_output['-COLUMNS-'],
-                "gap"           : ui_output['-GAP-'],
-                "ud_szone"      : ui_output['-HSZONES-'], 
-                "lr_szone"      : ui_output['-VSZONES-'],
-                "cards_folder"  : ui_output['-CFOLDER-'],
-                "save_to"       : ui_output['-PDFFOLDER-']}
-    create_save(save_folder, settings)
+    if ui_output != "Window closed":
+        settings = {"paper_width"   : ui_output['-PWIDTH-'],
+                    "paper_height"  : ui_output['-PHEIGHT-'],
+                    "card_width"    : ui_output['-CWIDTH-'],
+                    "card_height"   : ui_output['-CHEIGHT-'],
+                    "resize"        : ui_output['-SIZECHECKBOX-'],
+                    "double_sided"  : ui_output['-DOUBLECHECKBOX-'],
+                    "rows"          : ui_output['-ROWS-'],
+                    "columns"       : ui_output['-COLUMNS-'],
+                    "gap"           : ui_output['-GAP-'],
+                    "ud_szone"      : ui_output['-HSZONES-'], 
+                    "lr_szone"      : ui_output['-VSZONES-'],
+                    "cards_folder"  : ui_output['-CFOLDER-'],
+                    "save_to"       : ui_output['-PDFFOLDER-']}
+        create_save(save_folder, settings)
 
 main()

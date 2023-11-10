@@ -1,5 +1,6 @@
 dist/
 build/
 /PnP2PDF.spec
+/presets.pickle
 /.DS_Store
 color_profiles/.DS_Store
