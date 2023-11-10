@@ -1,0 +1,5 @@
+dist/
+build/
+/PnP2PDF.spec
+/.DS_Store
+color_profiles/.DS_Store

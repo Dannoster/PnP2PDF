@@ -1,17 +1,23 @@
+# Uncomment when using pyinstaller
+# import sys, os
+# os.chdir(sys._MEIPASS)
+
 import os
 import webbrowser
 import pickle
 import datetime
 
-import subprocess, sys
-def install(package): subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-install("PySimpleGUI")
-install("pillow")
+# import subprocess, sys
+# def install(package): subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+# install("PySimpleGUI")
+# install("pillow")
+# pyinstaller --add-data "color_profiles/sRGB-IEC61966-2.1.icc:color_profiles" --add-data "color_profiles/USWebCoatedSWOP.icc:color_profiles" --onefile --windowed PnP2PDF_v2.0.1.py
+# pyinstaller --add-data "color_profiles/sRGB-IEC61966-2.1.icc:color_profiles" --add-data "color_profiles/USWebCoatedSWOP.icc:color_profiles" --windowed PnP2PDF_v2.0.1.py
 
 import PySimpleGUI as sg
 from PIL import Image, ImageDraw, ImageCms
 
-PROGRAM_VERSION = "2.0.0"
+PROGRAM_VERSION = "2.0.1"
 PXLS_IN_MM = 11.81102362204 # need changes
 DEFAULT_SETTINGS = {"paper_width"   : 210,
             "paper_height"  : 297,
@@ -22,8 +28,8 @@ DEFAULT_SETTINGS = {"paper_width"   : 210,
             "rows"          : 3,
             "columns"       : 3,
             "gap"           : 2,
-            "ud_bleed"      : 0, 
-            "lr_bleed"      : 0,
+            "ud_szone"      : 0, 
+            "lr_szone"      : 0,
             "cards_folder"  : "",
             "save_to"       : ""}
 curr_path = os.path.dirname(os.path.realpath(__file__))
@@ -49,10 +55,10 @@ class Card(CardBack):
 class Sheet:
     def __init__(self, width: float, height: float, 
                  rows: int, columns: int, gap: int, 
-                 ud_bleed: int, lr_bleed: int, 
+                 ud_szone: int, lr_szone: int, 
                  cards: list[Card|CardBack]):
         """
-        'width', 'height', 'gap', 'ud_bleed', 'lr_bleed' in mm
+        'width', 'height', 'gap', 'ud_szone', 'lr_szone' in mm
         """ 
         self.width = width
         self.height = height
@@ -61,8 +67,8 @@ class Sheet:
         self.columns = columns
         self.gap = gap
 
-        self.ud_bleed = ud_bleed
-        self.lr_bleed = lr_bleed
+        self.ud_szone = ud_szone
+        self.lr_szone = lr_szone
 
         self.cards = cards
 
@@ -95,16 +101,16 @@ def draw_lines(draw: ImageDraw, paper_width, paper_height,
         y = y0 + card_height + i * (card_height + gap) + 1
         draw.line(((0, y - 2), (paper_width, y - 2)), fill=color, width=2)
 
-def draw_bleeds(draw: ImageDraw, paper_width, paper_height, hbleed, vbleed):
-    """paper_width, paper_height, hbleed, vbleed in pxls"""
+def draw_szones(draw: ImageDraw, paper_width, paper_height, hszone, vszone):
+    """paper_width, paper_height, hszone, vszone in pxls"""
     color = (0,143,156,56)#(215,0,0)
     line_width = 4
-    if hbleed:
-        draw.line(((0, hbleed-1), (paper_width, hbleed-1)), fill=color, width=line_width)
-        draw.line(((0, paper_height-hbleed-1), (paper_width, paper_height-hbleed-1)), fill=color, width=line_width)
-    if vbleed:
-        draw.line(((vbleed-1, 0), (vbleed-1, paper_height)), fill=color, width=line_width)
-        draw.line(((paper_width-vbleed-1, 0), (paper_width-vbleed-1, paper_height)), fill=color, width=line_width)
+    if hszone:
+        draw.line(((0, hszone-1), (paper_width, hszone-1)), fill=color, width=line_width)
+        draw.line(((0, paper_height-hszone-1), (paper_width, paper_height-hszone-1)), fill=color, width=line_width)
+    if vszone:
+        draw.line(((vszone-1, 0), (vszone-1, paper_height)), fill=color, width=line_width)
+        draw.line(((paper_width-vszone-1, 0), (paper_width-vszone-1, paper_height)), fill=color, width=line_width)
 
 def draw_cutting_corners(x: int, y: int, draw: ImageDraw, card_width, card_height):
     """all in pixels"""
@@ -193,7 +199,7 @@ class PDF_file:
         sht = self.sheets[0]
         crd = sht.cards[0]
         swidth, sheight = int(sht.width*PXLS_IN_MM), int(sht.height*PXLS_IN_MM)
-        hbleed, vbleed  = int(sht.ud_bleed*PXLS_IN_MM), int(sht.lr_bleed*PXLS_IN_MM), 
+        hszone, vszone  = int(sht.ud_szone*PXLS_IN_MM), int(sht.lr_szone*PXLS_IN_MM), 
         cwidth, cheight = int(crd.width*PXLS_IN_MM), int(crd.height*PXLS_IN_MM)
         rows, columns, gap = sht.rows, sht.columns, int(sht.gap*PXLS_IN_MM)
         x0 = (swidth - (columns-1)*gap - columns*cwidth) // 2
@@ -222,7 +228,7 @@ class PDF_file:
                 page_a.paste(card_image, (x, y))
                 create_mirrored_frame(x, y, page_a, card_image, gap, cwidth, cheight)
                 draw_cutting_corners(x, y, draw_a, cwidth, cheight)
-            draw_bleeds(draw_a, swidth, sheight, hbleed, vbleed)
+            draw_szones(draw_a, swidth, sheight, hszone, vszone)
             
             savedir = f"{dir}/{time}/{time}_page_{i+1:03}"
             if double_sided:
@@ -350,7 +356,7 @@ def create_cards(root_folder, card_width, card_height, smaller_size: bool, doubl
     return all_cards
 
 def create_sheets(cards: list[Card|CardBack], sheet_width: float, sheet_height: float, 
-                  rows: int, columns: int, gap: int, ud_bleed: int, lr_bleed: int):
+                  rows: int, columns: int, gap: int, ud_szone: int, lr_szone: int):
     # if len(cards) % (rows*columns) == 0:    
     #     sheets_total = len(cards) // (rows*columns)
     # else:
@@ -360,7 +366,7 @@ def create_sheets(cards: list[Card|CardBack], sheet_width: float, sheet_height: 
     while cards:
         selected_cards = cards[:rows*columns]
         del cards[:rows*columns]
-        sheet = Sheet(sheet_width, sheet_height, rows, columns, gap, ud_bleed, lr_bleed, selected_cards)
+        sheet = Sheet(sheet_width, sheet_height, rows, columns, gap, ud_szone, lr_szone, selected_cards)
         sheets.append(sheet)
     
     return sheets
@@ -394,14 +400,14 @@ def ui_window(settings: dict):
                  [sg.Text('Space between', size=(14, 1)), 
                   sg.InputText(f"{settings['gap']}", size=(6, 1), key="-GAP-"), sg.Text('mm'),
                   sg.Push(),
-                  sg.Text('Prepare files for DS print', enable_events = True, 
+                  sg.Text('Prepare files for double sided print', enable_events = True, 
                           font = ('Courier New', 10, 'underline'), 
                           key='URL https://github.com/Dannoster/PnP2PDF/tree/main#how-to-prepare-double-sided-cards')],
 
-                 [sg.Text("Horizontal bleeds", size=(14, 1)),
-                  sg.InputText(f"{settings['ud_bleed']}", size=(6, 1), key="-HBLEEDS-"), sg.Text('mm\t'),
-                  sg.Text("Vertical bleeds", size=(14, 1)),
-                  sg.InputText(f"{settings['lr_bleed']}", size=(6, 1), key="-VBLEEDS-"), sg.Text('mm')], 
+                 [sg.Text("Hor. safe zones", size=(14, 1)),
+                  sg.InputText(f"{settings['ud_szone']}", size=(6, 1), key="-HSZONES-"), sg.Text('mm\t'),
+                  sg.Text("Vert. safe zones", size=(14, 1)),
+                  sg.InputText(f"{settings['lr_szone']}", size=(6, 1), key="-VSZONES-"), sg.Text('mm')], 
 
                  [sg.Text('Cards folder', size=(14, 1)), 
                   sg.InputText(f"{settings['cards_folder']}", key='-CFOLDER-'), 
@@ -414,7 +420,7 @@ def ui_window(settings: dict):
                  [sg.Submit("Create PDF", size=(14, 1)), sg.Push(), sg.Text(f"v{PROGRAM_VERSION}")]
                 ]
 
-    window = sg.Window('PnP2PDF', form_rows)
+    window = sg.Window('PnP2PDF', form_rows, icon="icon.png")
 
     while True:
         event, values = window.read()
@@ -435,8 +441,8 @@ def ui_window(settings: dict):
                                    int(values['-ROWS-']), 
                                    int(values['-COLUMNS-']), 
                                    float(values['-GAP-'].replace(',','.')), 
-                                   float(values['-HBLEEDS-'].replace(',','.')), 
-                                   float(values['-VBLEEDS-'].replace(',','.')))
+                                   float(values['-HSZONES-'].replace(',','.')), 
+                                   float(values['-VSZONES-'].replace(',','.')))
             pdf = PDF_file(sheets)
             pdf.save(values['-PDFFOLDER-'],
                      values["-SIZECHECKBOX-"], # added recently
@@ -459,8 +465,8 @@ def main():
                 "rows"          : ui_output['-ROWS-'],
                 "columns"       : ui_output['-COLUMNS-'],
                 "gap"           : ui_output['-GAP-'],
-                "ud_bleed"      : ui_output['-HBLEEDS-'], 
-                "lr_bleed"      : ui_output['-VBLEEDS-'],
+                "ud_szone"      : ui_output['-HSZONES-'], 
+                "lr_szone"      : ui_output['-VSZONES-'],
                 "cards_folder"  : ui_output['-CFOLDER-'],
                 "save_to"       : ui_output['-PDFFOLDER-']}
     create_save(save_folder, settings)
