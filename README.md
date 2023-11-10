@@ -7,7 +7,9 @@ OR
 
 1. [Install Python](https://www.python.org/downloads/)
 2. [Install PIP](https://pip.pypa.io/en/stable/installation/)
-3. Run `PnP2PDF_v2.0.0.py` file
+3. Run `pip install PySimpleGUI` in terminal/command line
+4. Run `pip install pillow` in terminal/command line
+5. Open `PnP2PDF.py` file
    
 # Program Interface:
 <img width="584" alt="image" src="https://github.com/Dannoster/PnP2PDF/assets/91663466/76cb986b-e322-4fae-ba88-3925bf03d61b">
