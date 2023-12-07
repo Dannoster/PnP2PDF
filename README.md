@@ -1,7 +1,12 @@
 # PnP2PDF
-[Download MacOS Version](https://drive.google.com/drive/folders/1fADjKJbXosjtHfRhAyEQ-Opt4FbnRdQ7?usp=sharing)
+What is it? 
 
-[Download Windows Version](https://drive.google.com/drive/folders/1BOEETxM4q-EuxWY9ZJXSHYg7T8a1HAd-?usp=sharing)
+PnP2PDF (PnP to PDF) is a software that can help you to prepate your PnP cards for printing. The program helps you to assemble a PDF file from images of individual cards, double-sided cards are also supporrted.
+
+# Download and Setup
+[MacOS Version](https://drive.google.com/drive/folders/1fADjKJbXosjtHfRhAyEQ-Opt4FbnRdQ7?usp=sharing)
+
+[Windows Version](https://drive.google.com/drive/folders/1BOEETxM4q-EuxWY9ZJXSHYg7T8a1HAd-?usp=sharing)
 
 OR
 
@@ -30,3 +35,13 @@ The final structure is shown below:
 <img width="334" alt="image" src="https://github.com/Dannoster/PnP2PDF/assets/91663466/11636a16-23a6-4027-b687-1028d582da59">
 
 P.S. You can add as much card backs and their folders as you want, not only two pair as in example.
+
+# Known Issues
+* Windows version shows error after closing a program (doesn't affect on work).
+* Windows version may cause Microsoft Defender alerts.
+* Windows version may not draw cutting lines.
+
+
+
+
+
