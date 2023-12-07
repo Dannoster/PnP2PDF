@@ -1,7 +1,7 @@
 # PnP2PDF
 What is it? 
 
-PnP2PDF (PnP to PDF) is a software that can help you to prepate your PnP cards for printing. The program helps you to assemble a PDF file from images of individual cards, double-sided cards are also supporrted.
+PnP2PDF (PnP to PDF) is a software that can help you to prepate your PnP cards for printing. The program helps you to assemble a PDF file from images of individual cards, double-sided cards are also supported.
 
 # Download and Setup
 [MacOS Version](https://drive.google.com/drive/folders/1fADjKJbXosjtHfRhAyEQ-Opt4FbnRdQ7?usp=sharing)
