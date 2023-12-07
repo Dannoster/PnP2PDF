@@ -37,7 +37,7 @@ The final structure is shown below:
 P.S. You can add as much card backs and their folders as you want, not only two pair as in example.
 
 # Known Issues
-* Windows version shows error after closing a program (doesn't affect on work).
+* Windows version shows error after closing a program (doesn't affect work).
 * Windows version may cause Microsoft Defender alerts.
 * Windows version may not draw cutting lines.
 
