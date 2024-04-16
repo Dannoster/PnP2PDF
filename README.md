@@ -24,7 +24,7 @@ OR
 
 # How to Prepare Double Sided Cards
 1. Create folder.
-2. Add all card backs you will use in this folder (If you have back template with size bigger than card you may name it like that `Card Back Name_64,5_91,3.png`, i.e. add `_{back width in mm}_{back height in mm}` in name of file, use a comma to separate the integer and fractional parts of the width/height).
+2. Add all card backs you will use to this folder (If you have back template with size bigger than card you may name it like that `Card Back Name_64,5_91,3.png`, i.e. add `_{back width in mm}_{back height in mm}` in name of file, use a comma to separate the integer and fractional parts of the width/height).
 3. Create folders with the same names like card backs from previous step (except you dont need add `_{back width in mm}_{back height in mm}` at the end of folder name) and place all cards that have corresponding back.
 4. You can also create folder with name `Double Sided` for double sided cards that have no ordinary back, where you should place all sides together. Each pair of files will be printed as one double sided card. Be sure if files are sorted in alphabetical order.
 5. Finally you can add folder named `Single Sided` with cards that don't have back and place your cards here.
