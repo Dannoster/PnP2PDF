@@ -2,9 +2,7 @@
 
 This program helps you assemble a pdf file with images of individual playing cards and cut lines.
 
-# Download
-[Download](https://github.com/seyahdoo/PnP2PDF/releases/latest/download/PnP2PDF.exe)
-
+# [Download Release](https://github.com/seyahdoo/PnP2PDF/releases/latest/download/PnP2PDF.exe)
 
 # Program Interface:
 <img width="584" alt="image" src="https://github.com/Dannoster/PnP2PDF/assets/91663466/76cb986b-e322-4fae-ba88-3925bf03d61b">
