@@ -1,15 +1,11 @@
 # PnP2PDF
-What is it? 
 
-PnP2PDF (PnP to PDF) is a software that can help you to prepate your PnP cards for printing. The program helps you to assemble a PDF file from images of individual cards, double-sided cards are also supported.
+This program helps you assemble a pdf file with images of individual playing cards and cut lines.
 
-# Download and Setup
-1. [Install Python](https://www.python.org/downloads/)
-2. [Install PIP](https://pip.pypa.io/en/stable/installation/)
-3. Run `pip install PySimpleGUI` in terminal/command line
-4. Run `pip install pillow` in terminal/command line
-5. Open `PnP2PDF.py` file
-   
+# Download
+[Download](https://github.com/seyahdoo/PnP2PDF/releases/latest/download/PnP2PDF.exe)
+
+
 # Program Interface:
 <img width="584" alt="image" src="https://github.com/Dannoster/PnP2PDF/assets/91663466/76cb986b-e322-4fae-ba88-3925bf03d61b">
 

@@ -4,3 +4,7 @@ build/
 /presets.pickle
 /.DS_Store
 color_profiles/.DS_Store
+
+.idea/
+
+
