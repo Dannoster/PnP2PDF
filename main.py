@@ -220,14 +220,12 @@ class PdfFile:
     def __init__(self, sheets: list[Sheet]):
         self.sheets = sheets
 
-    def save(self, output_file: str, smaller_size: bool, double_sided: bool, format="png"):
-        
-        if not os.path.exists(f"{output_file}/{time}"):
-            try:
-                os.mkdir(f"{output_file}/{time}")
-            except:
-                os.mkdir(f"{output_file}")
-                os.mkdir(f"{output_file}/{time}")
+    def save(self, output_file: str, smaller_size: bool, format="png"):
+        double_sided = True
+        output_folder = os.path.dirname(output_file)
+        if not os.path.exists(output_folder):
+            os.mkdir(output_folder)
+        generated_image_files = []
 
         sht = self.sheets[0]
         crd = sht.cards[0]
@@ -254,11 +252,9 @@ class PdfFile:
                        cwidth, cheight, number_of_cards=len(sheet.cards))
             draw_safe_zones(draw_a, swidth, sheight, hszone, vszone)
             
-            savedir = f"{output_file}/{time}/{time}_page_{i + 1:03}"
-            if double_sided:
-                savedir += "a"
-            savedir += f".{format}"
-            page_a.save(savedir, dpi=(300, 300), compression=None, quality=100)
+            tmp_file_path = os.path.join(output_folder, f"page_{i + 1:03}a.{format}")
+            generated_image_files.append(tmp_file_path)
+            page_a.save(tmp_file_path, dpi=(300, 300), compression=None, quality=100)
             page_a.close()
         
         if double_sided:
@@ -276,14 +272,18 @@ class PdfFile:
                             create_mirrored_frame(x, y, page_b, back_image, gap, int(card.back.width*PXLS_IN_MM), int(card.back.height*PXLS_IN_MM))  
                         else:
                             place_cropped_back(x, y, page_b, back_image, gap, cwidth, cheight, int(card.back.width*PXLS_IN_MM), int(card.back.height*PXLS_IN_MM))
-                page_b.save(f"{output_file}/{time}/{time}_page_{i + 1:03}b.{format}",
-                            dpi=(300, 300), compression=None, quality=100)
+
+                tmp_file_path = os.path.join(output_folder, f"page_{i + 1:03}b.{format}")
+                generated_image_files.append(tmp_file_path)
+                page_b.save(tmp_file_path,dpi=(300, 300), compression=None, quality=100)
                 page_b.close()
-        pages_dirs = sorted(os.listdir(f"{output_file}/{time}"))
-        pages = [Image.open(f"{output_file}/{time}/{directory}") for directory in pages_dirs]
-        pages[0].save(f"{output_file}/{time}/{time}.pdf", "PDF", optimize=False,
+                
+        pages = [Image.open(file) for file in generated_image_files]
+        pages[0].save(output_file, "PDF", optimize=False,
                       save_all=True, append_images=pages[1:],
                       dpi=(300, 300), compression=None, quality=100)
+        for file in generated_image_files:
+            os.remove(file)
 
 def load_save(dir: str) -> dict:
     if os.path.exists(dir):
@@ -316,7 +316,8 @@ def find_card_dirs(folder):
     card_dirs.sort()
     return card_dirs
 
-def create_cards(root_folder, card_width, card_height, smaller_size: bool, double_sided: bool):
+def create_cards(root_folder, card_width, card_height, smaller_size: bool):
+    double_sided = True
     if smaller_size:
         koef = .98
     else:
@@ -406,7 +407,7 @@ def ui_window(settings: dict):
 
                  [sg.Text('Save PDF to', size=(14, 1)), 
                   sg.InputText(f"{settings['save_to']}", key='-PDFFOLDER-'), 
-                  sg.FolderBrowse(initial_folder=settings['save_to'])],
+                  sg.SaveAs(initial_folder=settings['save_to'], default_extension="pdf")],
 
                  [sg.Submit("Create PDF", size=(14, 1)), sg.Push(), sg.Text(f"v{PROGRAM_VERSION}")]
                 ]
@@ -424,8 +425,7 @@ def ui_window(settings: dict):
             cards = create_cards(values['-CFOLDER-'], 
                                  float(values['-CWIDTH-'].replace(',','.')), 
                                  float(values['-CHEIGHT-'].replace(',','.')),
-                                 values["-SIZECHECKBOX-"],
-                                 values['-DOUBLECHECKBOX-'])
+                                 values["-SIZECHECKBOX-"])
             sheets = create_sheets(cards, 
                                    float(values['-PWIDTH-'].replace(',','.')), 
                                    float(values['-PHEIGHT-'].replace(',','.')), 
@@ -436,8 +436,7 @@ def ui_window(settings: dict):
                                    float(values['-VSZONES-'].replace(',','.')))
             pdf = PdfFile(sheets)
             pdf.save(values['-PDFFOLDER-'],
-                     values["-SIZECHECKBOX-"],
-                     values['-DOUBLECHECKBOX-'])
+                     values["-SIZECHECKBOX-"])
             window.close()
             return values
             
