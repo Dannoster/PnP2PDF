@@ -1,1 +1,1 @@
-..\.venv\Scripts\python.exe ..\main.py --batch-mode --project-path .
+..\.venv\Scripts\python.exe ..\main.py

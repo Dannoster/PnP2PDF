@@ -1,6 +1,5 @@
 import os
 import webbrowser
-import pickle
 from pathlib import Path
 import shutil
 import sys
@@ -8,10 +7,17 @@ import socket
 import argparse
 import json
 
+PROGRAM_VERSION = "4.1.0"
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch-mode", action="store_true", default=False)
 parser.add_argument("--project-path", default=".")
 args = parser.parse_args()
+
+batch_mode = args.batch_mode
+
+if os.path.exists("cards"):
+   batch_mode = True 
 
 def running_linux():
     return sys.platform.startswith('linux')
@@ -55,12 +61,11 @@ try:
 except FileNotFoundError:
     pass
 
-if not args.batch_mode:
+if not batch_mode:
  import PySimpleGUI as sg
 
 from PIL import Image, ImageDraw
 
-PROGRAM_VERSION = "4.0.0"
 PXLS_IN_MM = 11.81102362204
 DEFAULT_SETTINGS = {"paper_width"   : 210,
             "paper_height"  : 297,
@@ -468,20 +473,21 @@ def from_ui_to_settings(ui_output):
     return settings
      
 def main():
-    if args.batch_mode:
+    if batch_mode:
         project_path = args.project_path
         settings = load_save(os.path.join(project_path, "settings.json"))
         settings["cards_folder"] = os.path.join(project_path, "cards")
         settings["save_to"] = os.path.join(project_path, "out.pdf")
         create_pdf(settings)
         return 
-    
-    save_folder = "settings.json"
-    settings = load_save(save_folder)
-    ui_output = ui_window(settings)
-    if ui_output != "Window closed":
-        settings = from_ui_to_settings(ui_output)
-        create_save(save_folder, settings)
+    else:
+        save_folder = "settings.json"
+        settings = load_save(save_folder)
+        ui_output = ui_window(settings)
+        if ui_output != "Window closed":
+            settings = from_ui_to_settings(ui_output)
+            create_save(save_folder, settings)
+        return 
 
 if __name__ == '__main__':
     main()
