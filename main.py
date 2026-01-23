@@ -115,7 +115,8 @@ class Sheet:
 def draw_lines(draw: ImageDraw, paper_width, paper_height, 
                rows, columns, gap, card_width, card_height, number_of_cards):
     """all in pixels"""
-    color = (0,0,0,47)#"darkgray"
+    alpha = 100
+    color = (0,0,0,alpha)
 
     x0 = (paper_width - (columns-1)*gap - columns*card_width) // 2
     y0 = (paper_height - (rows-1)*gap - rows*card_height) // 2
@@ -143,7 +144,7 @@ def draw_lines(draw: ImageDraw, paper_width, paper_height,
 
 def draw_szones(draw: ImageDraw, paper_width, paper_height, hszone, vszone):
     """paper_width, paper_height, hszone, vszone in pxls"""
-    color = (0,143,156,56)#(215,0,0)
+    color = (215,0,0)#(215,0,0)
     line_width = 4
     if hszone:
         draw.line(((0, hszone-1), (paper_width, hszone-1)), fill=color, width=line_width)
@@ -226,7 +227,7 @@ class PDF_file:
     def __init__(self, sheets: list[Sheet]):
         self.sheets = sheets
 
-    def save(self, dir: str, smaller_size: bool, double_sided: bool, format="jpeg"): # need changes
+    def save(self, dir: str, smaller_size: bool, double_sided: bool, format="png"): # need changes
 
         time = datetime.datetime.today().strftime("%d%m%y_%H%M")
         if not os.path.exists(f"{dir}/{time}"):
@@ -246,12 +247,10 @@ class PDF_file:
         y0 = (sheight - (rows-1)*gap - rows*cheight) // 2
 
         for i, sheet in enumerate(self.sheets):
-            page_a = Image.new('RGB',#'RGB', 
+            page_a = Image.new('RGBA',#'RGB', 
                                (int(sheet.width*PXLS_IN_MM),int(sheet.height*PXLS_IN_MM)), 
                                (255,255,255))#(255,255,255))
             draw_a = ImageDraw.Draw(page_a)
-            draw_lines(draw_a, swidth, sheight, rows, columns, gap, 
-                       cwidth, cheight, number_of_cards=len(sheet.cards))
             for j, card in enumerate(sheet.cards):
                 card_image = Image.open(card.dir).resize((int(card.width*PXLS_IN_MM), 
                                                           int(card.height*PXLS_IN_MM)))
@@ -268,6 +267,8 @@ class PDF_file:
                 page_a.paste(card_image, (x, y))
                 create_mirrored_frame(x, y, page_a, card_image, gap, cwidth, cheight)
                 draw_cutting_corners(x, y, draw_a, cwidth, cheight)
+            draw_lines(draw_a, swidth, sheight, rows, columns, gap,
+                       cwidth, cheight, number_of_cards=len(sheet.cards))
             draw_szones(draw_a, swidth, sheight, hszone, vszone)
             
             savedir = f"{dir}/{time}/{time}_page_{i+1:03}"
