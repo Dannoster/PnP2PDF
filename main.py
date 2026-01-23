@@ -1,11 +1,6 @@
-# Uncomment when using pyinstaller
-# import sys, os
-# os.chdir(sys._MEIPASS)
-
 import os
 import webbrowser
 import pickle
-import datetime
 from pathlib import Path
 import shutil
 import sys
@@ -54,11 +49,10 @@ except FileNotFoundError:
     pass
 
 import PySimpleGUI as sg
-from PIL import Image, ImageDraw, ImageCms
-
+from PIL import Image, ImageDraw
 
 PROGRAM_VERSION = "3.0.1"
-PXLS_IN_MM = 11.81102362204 # needed changes
+PXLS_IN_MM = 11.81102362204
 DEFAULT_SETTINGS = {"paper_width"   : 210,
             "paper_height"  : 297,
             "card_width"    : 63.5,
@@ -115,8 +109,7 @@ class Sheet:
 def draw_lines(draw: ImageDraw, paper_width, paper_height, 
                rows, columns, gap, card_width, card_height, number_of_cards):
     """all in pixels"""
-    alpha = 100
-    color = (0,0,0,alpha)
+    color = (0,0,0,100)
 
     x0 = (paper_width - (columns-1)*gap - columns*card_width) // 2
     y0 = (paper_height - (rows-1)*gap - rows*card_height) // 2
@@ -142,20 +135,20 @@ def draw_lines(draw: ImageDraw, paper_width, paper_height,
         y = y0 + card_height + i * (card_height + gap) + 1
         draw.line(((0, y - 2), (paper_width, y - 2)), fill=color, width=2)
 
-def draw_szones(draw: ImageDraw, paper_width, paper_height, hszone, vszone):
+def draw_safe_zones(draw: ImageDraw, paper_width, paper_height, horizontal_safe_zone, vertical_safe_zone):
     """paper_width, paper_height, hszone, vszone in pxls"""
     color = (215,0,0)#(215,0,0)
     line_width = 4
-    if hszone:
-        draw.line(((0, hszone-1), (paper_width, hszone-1)), fill=color, width=line_width)
-        draw.line(((0, paper_height-hszone-1), (paper_width, paper_height-hszone-1)), fill=color, width=line_width)
-    if vszone:
-        draw.line(((vszone-1, 0), (vszone-1, paper_height)), fill=color, width=line_width)
-        draw.line(((paper_width-vszone-1, 0), (paper_width-vszone-1, paper_height)), fill=color, width=line_width)
+    if horizontal_safe_zone:
+        draw.line(((0, horizontal_safe_zone - 1), (paper_width, horizontal_safe_zone - 1)), fill=color, width=line_width)
+        draw.line(((0, paper_height - horizontal_safe_zone - 1), (paper_width, paper_height - horizontal_safe_zone - 1)), fill=color, width=line_width)
+    if vertical_safe_zone:
+        draw.line(((vertical_safe_zone - 1, 0), (vertical_safe_zone - 1, paper_height)), fill=color, width=line_width)
+        draw.line(((paper_width - vertical_safe_zone - 1, 0), (paper_width - vertical_safe_zone - 1, paper_height)), fill=color, width=line_width)
 
 def draw_cutting_corners(x: int, y: int, draw: ImageDraw, card_width, card_height):
     """all in pixels"""
-    color = (0,0,0,47)#"darkgray"
+    color = (0,0,0,100)
     X_LEN = 14
     # upper left corner
     draw.line(((x - 1, y - 1), 
@@ -223,19 +216,18 @@ def place_cropped_back(x: int, y: int, sheet: Image, image: Image, gap,
                         back_width - cropped_w,back_height - cropped_h))
     sheet.paste(image, (x - gap//2 - 1, y - gap//2 - 1))
     
-class PDF_file:
+class PdfFile:
     def __init__(self, sheets: list[Sheet]):
         self.sheets = sheets
 
-    def save(self, dir: str, smaller_size: bool, double_sided: bool, format="png"): # need changes
-
-        time = datetime.datetime.today().strftime("%d%m%y_%H%M")
-        if not os.path.exists(f"{dir}/{time}"):
+    def save(self, output_file: str, smaller_size: bool, double_sided: bool, format="png"):
+        
+        if not os.path.exists(f"{output_file}/{time}"):
             try:
-                os.mkdir(f"{dir}/{time}")
+                os.mkdir(f"{output_file}/{time}")
             except:
-                os.mkdir(f"{dir}")
-                os.mkdir(f"{dir}/{time}")
+                os.mkdir(f"{output_file}")
+                os.mkdir(f"{output_file}/{time}")
 
         sht = self.sheets[0]
         crd = sht.cards[0]
@@ -247,21 +239,12 @@ class PDF_file:
         y0 = (sheight - (rows-1)*gap - rows*cheight) // 2
 
         for i, sheet in enumerate(self.sheets):
-            page_a = Image.new('RGBA',#'RGB', 
+            page_a = Image.new('RGBA', 
                                (int(sheet.width*PXLS_IN_MM),int(sheet.height*PXLS_IN_MM)), 
-                               (255,255,255))#(255,255,255))
+                               (255,255,255))
             draw_a = ImageDraw.Draw(page_a)
             for j, card in enumerate(sheet.cards):
-                card_image = Image.open(card.dir).resize((int(card.width*PXLS_IN_MM), 
-                                                          int(card.height*PXLS_IN_MM)))
-                # try:
-                #     card_image = ImageCms.profileToProfile(card_image, 
-                #                                            'color_profiles/sRGB-IEC61966-2.1.icc', 
-                #                                            'color_profiles/USWebCoatedSWOP.icc', 
-                #                                            outputMode='CMYK')
-                # except:
-                #     pass
-                # print(card.dir.split("/")[-1], card_image.mode, card_image.load()[0,0])
+                card_image = Image.open(card.dir).resize((int(card.width*PXLS_IN_MM), int(card.height*PXLS_IN_MM)))
                 x = x0 + j%columns * (cwidth + gap)
                 y = y0 + j//columns * (cheight + gap)
                 page_a.paste(card_image, (x, y))
@@ -269,9 +252,9 @@ class PDF_file:
                 draw_cutting_corners(x, y, draw_a, cwidth, cheight)
             draw_lines(draw_a, swidth, sheight, rows, columns, gap,
                        cwidth, cheight, number_of_cards=len(sheet.cards))
-            draw_szones(draw_a, swidth, sheight, hszone, vszone)
+            draw_safe_zones(draw_a, swidth, sheight, hszone, vszone)
             
-            savedir = f"{dir}/{time}/{time}_page_{i+1:03}"
+            savedir = f"{output_file}/{time}/{time}_page_{i + 1:03}"
             if double_sided:
                 savedir += "a"
             savedir += f".{format}"
@@ -280,48 +263,27 @@ class PDF_file:
         
         if double_sided:
             for i, sheet in enumerate(self.sheets):            
-                page_b = Image.new('RGB',#'RGB', 
+                page_b = Image.new('RGBA',
                                    (int(sheet.width*PXLS_IN_MM),int(sheet.height*PXLS_IN_MM)), 
-                                   (255,255,255))#(255,255,255))
-                
+                                   (255,255,255))
                 for j, card in enumerate(sheet.cards):
                     if card.back:
-                        back_image = Image.open(card.back.dir).resize((int(card.back.width*PXLS_IN_MM),
-                                                                       int(card.back.height*PXLS_IN_MM)))
-                        # try:
-                        #     back_image = ImageCms.profileToProfile(back_image, 
-                        #                                            'color_profiles/sRGB-IEC61966-2.1.icc', 
-                        #                                            'color_profiles/USWebCoatedSWOP.icc', 
-                        #                                            outputMode='CMYK')
-                        # except: 
-                        #     pass
+                        back_image = Image.open(card.back.dir).resize((int(card.back.width*PXLS_IN_MM), int(card.back.height*PXLS_IN_MM)))
                         x = x0 + (columns-1-j)%columns * (cwidth + gap)
                         y = y0 + j//columns * (cheight + gap)
                         if card.back.width == card.width and card.back.height == card.height:
                             page_b.paste(back_image, (x, y))
-                            create_mirrored_frame(x, y, page_b, back_image, gap, 
-                                                  int(card.back.width*PXLS_IN_MM), 
-                                                  int(card.back.height*PXLS_IN_MM))  
+                            create_mirrored_frame(x, y, page_b, back_image, gap, int(card.back.width*PXLS_IN_MM), int(card.back.height*PXLS_IN_MM))  
                         else:
-                            place_cropped_back(x, y, page_b, back_image, gap, cwidth, cheight,
-                                               int(card.back.width*PXLS_IN_MM), 
-                                               int(card.back.height*PXLS_IN_MM))
-
-                page_b.save(f"{dir}/{time}/{time}_page_{i+1:03}b.{format}", 
+                            place_cropped_back(x, y, page_b, back_image, gap, cwidth, cheight, int(card.back.width*PXLS_IN_MM), int(card.back.height*PXLS_IN_MM))
+                page_b.save(f"{output_file}/{time}/{time}_page_{i + 1:03}b.{format}",
                             dpi=(300, 300), compression=None, quality=100)
                 page_b.close()
-                
-        pages_dirs = sorted(os.listdir(f"{dir}/{time}"))
-        pages = [Image.open(f"{dir}/{time}/{directory}") for directory in pages_dirs]
-        pages[0].save(f"{dir}/{time}/{time}.pdf", "PDF", optimize=False, 
-                        save_all=True, append_images=pages[1:], 
-                        dpi=(300, 300), compression=None, quality=100)
-
-            
-            
-
-
-
+        pages_dirs = sorted(os.listdir(f"{output_file}/{time}"))
+        pages = [Image.open(f"{output_file}/{time}/{directory}") for directory in pages_dirs]
+        pages[0].save(f"{output_file}/{time}/{time}.pdf", "PDF", optimize=False,
+                      save_all=True, append_images=pages[1:],
+                      dpi=(300, 300), compression=None, quality=100)
 
 def load_save(dir: str) -> dict:
     if os.path.exists(dir):
@@ -355,7 +317,6 @@ def find_card_dirs(folder):
     return card_dirs
 
 def create_cards(root_folder, card_width, card_height, smaller_size: bool, double_sided: bool):
-
     if smaller_size:
         koef = .98
     else:
@@ -367,7 +328,6 @@ def create_cards(root_folder, card_width, card_height, smaller_size: bool, doubl
     single_side_folder = root_folder
 
     if double_sided:
-       
         backs = []
         for dir in find_back_dirs(root_folder):
             try:
@@ -396,24 +356,14 @@ def create_cards(root_folder, card_width, card_height, smaller_size: bool, doubl
 
     return all_cards
 
-def create_sheets(cards: list[Card|CardBack], sheet_width: float, sheet_height: float, 
-                  rows: int, columns: int, gap: int, ud_szone: int, lr_szone: int):
-    # if len(cards) % (rows*columns) == 0:    
-    #     sheets_total = len(cards) // (rows*columns)
-    # else:
-    #     sheets_total = len(cards) // (rows*columns) + 1
-    
+def create_sheets(cards: list[Card|CardBack], sheet_width: float, sheet_height: float, rows: int, columns: int, gap: int, ud_szone: int, lr_szone: int):
     sheets = []
     while cards:
         selected_cards = cards[:rows*columns]
         del cards[:rows*columns]
         sheet = Sheet(sheet_width, sheet_height, rows, columns, gap, ud_szone, lr_szone, selected_cards)
         sheets.append(sheet)
-    
     return sheets
-
-
-    
 
 def ui_window(settings: dict):
     form_rows = [
@@ -484,15 +434,13 @@ def ui_window(settings: dict):
                                    float(values['-GAP-'].replace(',','.')), 
                                    float(values['-HSZONES-'].replace(',','.')), 
                                    float(values['-VSZONES-'].replace(',','.')))
-            pdf = PDF_file(sheets)
+            pdf = PdfFile(sheets)
             pdf.save(values['-PDFFOLDER-'],
-                     values["-SIZECHECKBOX-"], # added recently
+                     values["-SIZECHECKBOX-"],
                      values['-DOUBLECHECKBOX-'])
             window.close()
             return values
             
-        
-        
 def main():
     save_folder = "presets.pickle"
     settings = load_save(save_folder)
