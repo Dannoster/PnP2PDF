@@ -5,6 +5,13 @@ from pathlib import Path
 import shutil
 import sys
 import socket
+import argparse
+import json
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--batch-mode", action="store_true", default=False)
+parser.add_argument("--project-path", default=".")
+args = parser.parse_args()
 
 def running_linux():
     return sys.platform.startswith('linux')
@@ -48,10 +55,12 @@ try:
 except FileNotFoundError:
     pass
 
-import PySimpleGUI as sg
+if not args.batch_mode:
+ import PySimpleGUI as sg
+
 from PIL import Image, ImageDraw
 
-PROGRAM_VERSION = "3.1.0"
+PROGRAM_VERSION = "4.0.0"
 PXLS_IN_MM = 11.81102362204
 DEFAULT_SETTINGS = {"paper_width"   : 210,
             "paper_height"  : 297,
@@ -286,14 +295,14 @@ class PdfFile:
 
 def load_save(dir: str) -> dict:
     if os.path.exists(dir):
-        with open(dir, "rb") as file:
-            return pickle.load(file)
+        with open(dir, "r") as file:
+            return json.load(file)
     else:
         return DEFAULT_SETTINGS
 
 def create_save(dir: str, save: dict):
-    with open(dir, 'wb') as file:     
-        pickle.dump(save, file)
+    with open(dir, 'w') as file:
+        json.dump(save, file, indent=4)
 
 def find_back_dirs(folder: str) -> list[str]:
     back_dirs = []
@@ -370,7 +379,7 @@ def ui_window(settings: dict):
                  [sg.Text('Paper size', size=(14, 1)), 
                   sg.InputText(settings["paper_width"], size=(6, 1), key="-PWIDTH-"), sg.Text('x'), 
                   sg.InputText(settings["paper_height"], size=(6, 1), key="-PHEIGHT-"), sg.Text('mm'), 
-                  sg.Push(), 
+                  sg.Push() , 
                   sg.Text('Contact me', enable_events = True, 
                           font = ('Courier New', 12, 'underline'), 
                           key='URL https://www.t.me/nNekoChan')],
@@ -420,41 +429,58 @@ def ui_window(settings: dict):
             url = event.split(' ')[1]
             webbrowser.open(url)
         elif event.startswith("Create PDF"):
-            cards = create_cards(values['-CFOLDER-'], 
-                                 float(values['-CWIDTH-'].replace(',','.')), 
-                                 float(values['-CHEIGHT-'].replace(',','.')),
-                                 values["-SIZECHECKBOX-"])
-            sheets = create_sheets(cards, 
-                                   float(values['-PWIDTH-'].replace(',','.')), 
-                                   float(values['-PHEIGHT-'].replace(',','.')), 
-                                   int(values['-ROWS-']), 
-                                   int(values['-COLUMNS-']), 
-                                   float(values['-GAP-'].replace(',','.')), 
-                                   float(values['-HSZONES-'].replace(',','.')), 
-                                   float(values['-VSZONES-'].replace(',','.')))
-            pdf = PdfFile(sheets)
-            pdf.save(values['-PDFFOLDER-'],
-                     values["-SIZECHECKBOX-"])
+            settings = from_ui_to_settings(values)
+            create_pdf(settings)
             window.close()
             return values
-            
+
+def create_pdf(settings):
+    cards = create_cards(settings['cards_folder'],
+                         float(settings['card_width'].replace(',','.')),
+                         float(settings['card_height'].replace(',','.')),
+                         settings["resize"])
+    sheets = create_sheets(cards,
+                           float(settings['paper_width'].replace(',','.')),
+                           float(settings['paper_height'].replace(',','.')),
+                           int(settings['rows']),
+                           int(settings['columns']),
+                           int(settings['gap']),
+                           int(settings['ud_szone']),
+                           int(settings['lr_szone']))
+    pdf = PdfFile(sheets)
+    pdf.save(settings['save_to'],
+             settings["resize"])
+    return 
+
+def from_ui_to_settings(ui_output):
+    settings = {"paper_width"   : ui_output['-PWIDTH-'],
+                "paper_height"  : ui_output['-PHEIGHT-'],
+                "card_width"    : ui_output['-CWIDTH-'],
+                "card_height"   : ui_output['-CHEIGHT-'],
+                "resize"        : ui_output['-SIZECHECKBOX-'],
+                "rows"          : ui_output['-ROWS-'],
+                "columns"       : ui_output['-COLUMNS-'],
+                "gap"           : ui_output['-GAP-'],
+                "ud_szone"      : ui_output['-HSZONES-'],
+                "lr_szone"      : ui_output['-VSZONES-'],
+                "cards_folder"  : ui_output['-CFOLDER-'],
+                "save_to"       : ui_output['-PDFFOLDER-']}
+    return settings
+     
 def main():
-    save_folder = "presets.pickle"
+    if args.batch_mode:
+        project_path = args.project_path
+        settings = load_save(os.path.join(project_path, "settings.json"))
+        settings["cards_folder"] = os.path.join(project_path, "cards")
+        settings["save_to"] = os.path.join(project_path, "out.pdf")
+        create_pdf(settings)
+        return 
+    
+    save_folder = "settings.json"
     settings = load_save(save_folder)
     ui_output = ui_window(settings)
     if ui_output != "Window closed":
-        settings = {"paper_width"   : ui_output['-PWIDTH-'],
-                    "paper_height"  : ui_output['-PHEIGHT-'],
-                    "card_width"    : ui_output['-CWIDTH-'],
-                    "card_height"   : ui_output['-CHEIGHT-'],
-                    "resize"        : ui_output['-SIZECHECKBOX-'],
-                    "rows"          : ui_output['-ROWS-'],
-                    "columns"       : ui_output['-COLUMNS-'],
-                    "gap"           : ui_output['-GAP-'],
-                    "ud_szone"      : ui_output['-HSZONES-'], 
-                    "lr_szone"      : ui_output['-VSZONES-'],
-                    "cards_folder"  : ui_output['-CFOLDER-'],
-                    "save_to"       : ui_output['-PDFFOLDER-']}
+        settings = from_ui_to_settings(ui_output)
         create_save(save_folder, settings)
 
 if __name__ == '__main__':
