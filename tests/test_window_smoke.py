@@ -445,6 +445,24 @@ def test_toggling_the_output_switch_shows_and_hides_the_row(gui, card_folder):
         window.destroy()
 
 
+def test_clicking_the_checkboxes_is_logged(gui, card_folder, log_dir):
+    """Flipping the checkboxes writes one toggle line apiece."""
+    module, _ = gui
+    window = _window(module, _cards(card_folder))
+    try:
+        window._toggle_double()
+        window._toggle_size()
+        _pump(window, lambda: not window._preview.is_running()
+              and not window._preview._pending,
+              what="the preview queue to settle")
+
+        text = (log_dir / module.crash.LOG_NAME).read_text(encoding="utf-8")
+        assert "toggle name=double_check" in text
+        assert "toggle name=size_check" in text
+    finally:
+        window.on_close()
+
+
 def test_an_existing_output_folder_shows_the_row_ticked(gui, card_folder, tmp_path):
     module, _ = gui
     folder = _cards(card_folder)

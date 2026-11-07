@@ -69,6 +69,27 @@ def test_log_event_flattens_newlines(log_dir):
     assert lines[0].endswith("folder path=a b c")
 
 
+def test_a_field_may_be_called_name(log_dir):
+    path = crash.log_event("toggle", name="double", value=1)
+
+    assert path == str(log_dir / crash.LOG_NAME)
+    lines = _read(log_dir / crash.LOG_NAME).splitlines()
+    assert len(lines) == 1
+    assert "toggle" in lines[0]
+    assert "name=double" in lines[0]
+    assert "value=1" in lines[0]
+
+
+def test_a_broken_field_does_not_raise(log_dir):
+    class Broken:
+        def __str__(self):
+            raise RuntimeError("bad str")
+
+    assert crash.log_event("toggle", bad=Broken()) in ("", str(log_dir / crash.LOG_NAME))
+    crash.log_message("still works")
+    assert "still works" in _read(log_dir / crash.LOG_NAME)
+
+
 def test_log_rotates_at_the_size_limit(log_dir):
     path = log_dir / crash.LOG_NAME
     path.write_bytes(b"x" * crash.MAX_BYTES)

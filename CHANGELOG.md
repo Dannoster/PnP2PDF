@@ -25,6 +25,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the known-issues list no longer repeats fixes that already shipped
 
 ### Fixed
+- clicking a checkbox no longer raises `log_event() got multiple values for
+  argument 'name'`: the crash log takes the event name positionally and never
+  raises, whatever it is asked to write
 - the macOS bundle is re-signed after its version is written, so it no longer reports "is damaged" on launch
 - the build script detects and repairs a virtual environment whose packages cannot be imported
 - the build script rebuilds a virtual environment that holds packages or scripts from another platform

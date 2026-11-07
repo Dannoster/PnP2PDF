@@ -86,11 +86,15 @@ def _field(value) -> str:
     return text
 
 
-def log_event(name: str, **fields) -> str:
+def log_event(event: str, /, **fields) -> str:
     """Append one action line, e.g. ``click button=create``; return the path."""
-    parts = [str(name)]
-    parts.extend(f"{key}={_field(value)}" for key, value in fields.items())
-    return _append(" ".join(parts))
+    try:
+        parts = [str(event)]
+        parts.extend(f"{key}={_field(value)}" for key, value in fields.items())
+        line = " ".join(parts)
+    except Exception:
+        return ""
+    return _append(line)
 
 
 def install_handlers() -> str:
