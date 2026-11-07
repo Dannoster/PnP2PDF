@@ -8,6 +8,7 @@ import importlib
 import time
 
 import pytest
+from PIL import Image
 
 import fake_ctk
 from pnp2pdf.settings import DEFAULT_SETTINGS
@@ -138,6 +139,117 @@ def test_typing_in_a_field_re_renders_the_preview(gui, card_folder):
         window.destroy()
 
 
+def test_the_picture_is_never_cleared_with_none(gui, card_folder):
+    module, _ = gui
+    folder = _cards(card_folder)
+    window = _window(module, folder)
+    try:
+        _pump(window, lambda: len(window._page_views) == 2,
+              what="two preview pages")
+        picture = window._picture
+        seen = []
+        original = picture.configure
+
+        def record(**kwargs):
+            original(**kwargs)
+            if "image" in kwargs:
+                seen.append(kwargs["image"])
+
+        picture.configure = record
+        stale = list(window._page_views) + list(window._page_thumbs)
+
+        window._clear_preview()
+
+        assert seen, "the preview label was never reconfigured"
+        assert all(isinstance(image, module.ctk.CTkImage) for image in seen)
+        assert picture.image is seen[-1]
+        assert picture.image not in stale
+    finally:
+        window.destroy()
+
+
+def test_a_failing_preview_update_is_logged_not_raised(
+        gui, card_folder, tmp_path):
+    module, _ = gui
+    folder = _cards(card_folder)
+    window = _window(module, folder)
+    picture = window._picture
+    original = picture.configure
+
+    def boom(**kwargs):
+        raise RuntimeError('image "pyimage2" doesn\'t exist')
+
+    try:
+        _pump(window, lambda: len(window._page_views) == 2,
+              what="two preview pages")
+        picture.configure = boom
+        window._show_page(0)
+    finally:
+        picture.configure = original
+        window.destroy()
+
+    text = (tmp_path / module.crash.LOG_NAME).read_text(encoding="utf-8")
+    assert "ui-failed" in text
+
+
+def test_the_preview_stops_after_three_failed_redraws(
+        gui, card_folder, tmp_path):
+    module, handles = gui
+    folder = _cards(card_folder)
+    window = _window(module, folder)
+    picture = window._picture
+    original = picture.configure
+
+    def boom(**kwargs):
+        raise RuntimeError('image "pyimage2" doesn\'t exist')
+
+    def ui_failed_lines():
+        text = (tmp_path / module.crash.LOG_NAME).read_text(encoding="utf-8")
+        return [line for line in text.splitlines() if "ui-failed" in line]
+
+    try:
+        _pump(window, lambda: len(window._page_views) == 2,
+              what="two preview pages")
+        picture.configure = boom
+        window._schedule_preview()
+
+        _pump(window, lambda: window._ui_failures >= 3,
+              what="three failed redraws")
+        _pump(window, lambda: not window._preview.is_running()
+              and not window._preview._pending,
+              what="the preview queue to settle")
+        window.update()
+
+        assert window._ui_failures == 3
+        lines = ui_failed_lines()
+        assert len(lines) == 3, lines
+        for attempt, line in enumerate(lines, start=1):
+            assert f"attempt={attempt}" in line
+        assert "Preview unavailable" in window._preview_status.text
+
+        other = tmp_path / "more-cards"
+        other.mkdir()
+        Image.new("RGB", (300, 400), (20, 40, 60)).save(other / "1.png")
+        handles["filedialog"].directory = str(other)
+        window._choose_folder("-CFOLDER-")
+
+        assert window._ui_failures == 0, "a new folder re-arms the preview"
+        _pump(window, lambda: window._ui_failures >= 3,
+              what="three more failed redraws")
+        _pump(window, lambda: not window._preview.is_running()
+              and not window._preview._pending,
+              what="the preview queue to settle again")
+        window.update()
+
+        lines = ui_failed_lines()
+        assert len(lines) == 6, lines
+        for attempt, line in enumerate(lines[3:], start=1):
+            assert f"attempt={attempt}" in line
+    finally:
+        picture.configure = original
+        window.destroy()
+
+
 def test_build_from_the_window(gui, card_folder, tmp_path):
     module, _ = gui
     folder = _cards(card_folder)
@@ -258,7 +370,7 @@ def test_an_empty_folder_shows_an_invitation(gui):
         assert window._preview_status.text == (
             "Choose a cards folder to see the preview.")
         assert window._preview_status.cget("text_color") == module._GREY
-        assert window._picture.image is None
+        assert isinstance(window._picture.image, module.ctk.CTkImage)
         assert window._summary.text == ""
         assert window._page_views == []
 
@@ -280,7 +392,7 @@ def test_a_folder_without_images_shows_a_red_error(gui, tmp_path):
               what="the error message")
 
         assert window._preview_status.text
-        assert window._picture.image is None
+        assert isinstance(window._picture.image, module.ctk.CTkImage)
         assert window._page_views == []
     finally:
         window.destroy()

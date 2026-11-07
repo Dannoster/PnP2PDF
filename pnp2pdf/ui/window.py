@@ -14,6 +14,7 @@ import webbrowser
 from pathlib import Path
 
 import customtkinter as ctk
+from PIL import Image
 
 from pnp2pdf import __version__ as PROGRAM_VERSION
 from pnp2pdf import crash
@@ -57,6 +58,19 @@ _FOLDER_CAPTIONS = {
     "-CFOLDER-": "Cards folder",
     "-PDFFOLDER-": "Save the PDF to",
 }
+
+_BLANK_PICTURE = None
+
+
+def _blank_picture():
+    """A 1x1 white CTkImage, so the label never points at a deleted Tk image."""
+    global _BLANK_PICTURE
+    if _BLANK_PICTURE is None:
+        _BLANK_PICTURE = ctk.CTkImage(
+            light_image=Image.new("RGB", (1, 1), (255, 255, 255)),
+            dark_image=Image.new("RGB", (1, 1), (255, 255, 255)),
+            size=(1, 1))
+    return _BLANK_PICTURE
 
 
 def _section(parent, title):
@@ -114,6 +128,8 @@ class PnP2PDFWindow(ctk.CTk):
         self._page_views = []
         self._page_thumbs = []
         self._thumb_buttons = []
+        self._retired_images = []
+        self._ui_failures = 0  # consecutive preview redraw failures
         self._page_index = 0
 
         self._build_ui(settings)
@@ -367,6 +383,7 @@ class PnP2PDFWindow(ctk.CTk):
             entry = self._entries[key]
             entry.delete(0, "end")
             entry.insert(0, chosen)
+            self._ui_failures = 0  # a new folder deserves a fresh attempt
             self._schedule_preview()
 
     # -- preview ---------------------------------------------------------
@@ -409,7 +426,41 @@ class PnP2PDFWindow(ctk.CTk):
             return
         self._show_pages(result.images, result.summary)
 
+    def _show_image(self, image):
+        if self._ui_failures > 2:
+            self._preview_status.configure(
+                text=f"Preview unavailable — details were written to "
+                     f"{crash.log_path()}", text_color=_ERROR)
+            return False
+        try:
+            self._picture.configure(image=image, text="")
+        except Exception as error:
+            # tkinter is not importable in the test environment, so catching
+            # Exception here (rather than tkinter.TclError) is deliberate.
+            self._ui_failures += 1
+            crash.log_event("ui-failed", widget="preview",
+                            attempt=self._ui_failures, error=error)
+            self._retired_images = list(self._page_views) + list(self._page_thumbs)
+            self._page_views = []
+            self._page_thumbs = []
+            try:
+                self._picture.configure(image=_blank_picture(), text="")
+            except Exception:
+                pass
+            if self._ui_failures <= 2:
+                if self._entries["-CFOLDER-"].get().strip():
+                    self._schedule_preview()
+            else:
+                self._preview_status.configure(
+                    text=f"Preview unavailable — details were written to "
+                         f"{crash.log_path()}", text_color=_ERROR)
+            return False
+        self._ui_failures = 0
+        return True
+
     def _clear_preview(self):
+        self._show_image(_blank_picture())
+        self._retired_images = self._page_views + self._page_thumbs
         for button in self._thumb_buttons:
             button.destroy()
         self._thumb_buttons = []
@@ -420,6 +471,8 @@ class PnP2PDFWindow(ctk.CTk):
 
     def _show_pages(self, images, summary):
         crash.log_event("preview", pages=len(images or []), summary=summary)
+        self._show_image(_blank_picture())
+        self._retired_images = self._page_views + self._page_thumbs
         self._preview_status.configure(text="", text_color=_GREY)
         self._summary.configure(text=summary)
         for button in self._thumb_buttons:
@@ -446,13 +499,13 @@ class PnP2PDFWindow(ctk.CTk):
 
     def _show_page(self, index):
         if not self._page_views:
-            self._picture.configure(image=None, text="")
+            self._show_image(_blank_picture())
             self._page_label.configure(text="1 / 1")
             self._set_nav(1)
             return
         index = max(0, min(index, len(self._page_views) - 1))
         self._page_index = index
-        self._picture.configure(image=self._page_views[index], text="")
+        self._show_image(self._page_views[index])
         self._page_label.configure(text=f"{index + 1} / {len(self._page_views)}")
         self._set_nav(len(self._page_views))
 

@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - the macOS bundle is re-signed after its version is written, so it no longer reports "is damaged" on launch
 - the build script detects and repairs a virtual environment whose packages cannot be imported
 - the build script rebuilds a virtual environment that holds packages or scripts from another platform
+- the preview panel no longer crashes with `image "pyimage2" doesn't exist` after the preview is cleared, and a failed redraw is written to the log instead of stopping the window
 
 ## [3.0.0] - 2026-11-07
 
