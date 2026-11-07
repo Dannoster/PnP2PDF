@@ -41,6 +41,29 @@ venv_arch_matches_host() {
     [ "$host" = "$venv" ]
 }
 
+# Console scripts carry a #! line pointing at the interpreter that created the
+# venv; if that interpreter is gone the scripts cannot run and only a rebuild
+# can fix them.
+venv_scripts_usable() {
+    for tool in pyinstaller pytest pip; do
+        script=".venv/bin/$tool"
+        [ -f "$script" ] || return 1
+        interp="$(sed -n '1s/^#! *//p' "$script" | awk '{print $1}')"
+        [ -n "$interp" ] && [ -x "$interp" ] || return 1
+    done
+    return 0
+}
+
+# pip check complains about packages built for another platform; that cannot be
+# repaired per-package, so it forces a rebuild too.
+venv_platform_usable() {
+    out="$("$(venv_python)" -m pip check 2>&1 || true)"
+    case "$out" in
+        *"not supported on this platform"*) return 1 ;;
+    esac
+    return 0
+}
+
 create_venv() {
     echo "==> Creating the virtual environment in .venv"
     rm -rf .venv
@@ -103,9 +126,19 @@ repair_imports() {
     check_imports
 }
 
-if ! venv_is_usable || ! venv_arch_matches_host; then
-    create_venv
+rebuild=0
+venv_is_usable || rebuild=1
+venv_arch_matches_host || rebuild=1
+if [ "$rebuild" -eq 0 ] && ! venv_scripts_usable; then
+    echo "==> The scripts in .venv point at a python that is not there — rebuilding .venv"
+    rebuild=1
 fi
+if [ "$rebuild" -eq 0 ] && ! venv_platform_usable; then
+    echo "==> .venv holds packages built for another platform — rebuilding .venv"
+    rebuild=1
+fi
+[ "$rebuild" -eq 1 ] && create_venv
+
 install_requirements
 
 if ! repair_imports; then
@@ -121,6 +154,12 @@ fi
 
 echo "==> Checking installed packages for conflicts"
 "$(venv_python)" -m pip check || true
+
+if ! venv_platform_usable; then
+    echo "Error: the installed packages still do not match this platform." >&2
+    echo "Check that python3 and pip are native for this machine, then retry." >&2
+    exit 1
+fi
 
 if [ "$NO_TESTS" -eq 0 ]; then
     echo "==> Running the test suite"
@@ -145,7 +184,7 @@ fi
 
 if [ -n "${PNP2PDF_BUILD_DRY:-}" ]; then
     echo "==> Dry run: PyInstaller command that would run"
-    echo ".venv/bin/pyinstaller ${PYINSTALLER_ARGS[*]} PnP2PDF.py"
+    echo "$(venv_python) -m PyInstaller ${PYINSTALLER_ARGS[*]} PnP2PDF.py"
     exit 0
 fi
 
@@ -153,7 +192,7 @@ echo "==> Clearing build/ and dist/"
 rm -rf build dist
 
 echo "==> Running PyInstaller"
-.venv/bin/pyinstaller "${PYINSTALLER_ARGS[@]}" PnP2PDF.py
+"$(venv_python)" -m PyInstaller "${PYINSTALLER_ARGS[@]}" PnP2PDF.py
 
 if [ "$(uname -s)" = "Darwin" ]; then
     echo "==> Setting the bundle version from pyproject.toml"
