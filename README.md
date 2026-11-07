@@ -57,6 +57,9 @@ pnp2pdf-cli --cards ~/cards --out ~/pdf
 pnp2pdf-cli --cards ~/cards --out ~/pdf --double-sided
 ```
 
+See [`examples/`](examples/) for ready-to-build sample card sets covering every
+layout, with the build commands for each.
+
 Exit codes: `0` success, `1` unexpected error, `2` bad input, `130` cancelled.
 
 ## Program interface
