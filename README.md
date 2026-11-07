@@ -18,6 +18,17 @@ PnP2PDF (PnP to PDF) is a software that can help you to prepate your PnP cards f
 - Run with `python PnP2PDF.py` or `python -m pnp2pdf`.
 - Alternatively, `pip install .` installs a `pnp2pdf` command.
 
+## Command line
+
+The window can be skipped entirely with the `pnp2pdf-cli` command:
+
+```bash
+pnp2pdf-cli --cards ~/cards --out ~/pdf
+pnp2pdf-cli --cards ~/cards --out ~/pdf --double-sided
+```
+
+Exit codes: `0` success, `1` unexpected error, `2` bad input, `130` cancelled.
+
 # Download and Setup
 [MacOS Version](https://drive.google.com/drive/folders/1fADjKJbXosjtHfRhAyEQ-Opt4FbnRdQ7?usp=sharing)
 
