@@ -31,6 +31,11 @@ curr_path = os.path.dirname(os.path.realpath(__file__))
 ICC_DIR = os.path.join(curr_path, "color_profiles")
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".tif", ".tiff")
 
+# Cut lines are drawn straight onto a CMYK page, so this is a CMYK colour:
+# (0, 0, 0, 47) is black at 47%, a light grey. An alpha value would be
+# silently ignored on a CMYK image.
+CUT_LINE_COLOUR = (0, 0, 0, 47)
+
 
 def icc_profile(name: str) -> str:
     """Absolute path to a bundled ICC profile (works regardless of CWD)."""
@@ -77,7 +82,6 @@ class Sheet:
 def draw_lines(draw: ImageDraw, paper_width, paper_height, 
                rows, columns, gap, card_width, card_height, number_of_cards):
     """all in pixels"""
-    color = (0,0,0,47)#"darkgray"
 
     x0 = (paper_width - (columns-1)*gap - columns*card_width) // 2
     y0 = (paper_height - (rows-1)*gap - rows*card_height) // 2
@@ -94,14 +98,14 @@ def draw_lines(draw: ImageDraw, paper_width, paper_height,
 
     for i in range(x_num):
         x = x0 + i * (card_width + gap) - 1
-        draw.line(((x, 0), (x, paper_height)), fill=color, width=2)
+        draw.line(((x, 0), (x, paper_height)), fill=CUT_LINE_COLOUR, width=2)
         x = x0 + card_width + i * (card_width + gap) + 1
-        draw.line(((x - 2, 0), (x - 2, paper_height)), fill=color, width=2)
+        draw.line(((x - 2, 0), (x - 2, paper_height)), fill=CUT_LINE_COLOUR, width=2)
     for i in range(y_num):
         y = y0 + i * (card_height + gap) - 1
-        draw.line(((0, y), (paper_width, y)), fill=color, width=2)
+        draw.line(((0, y), (paper_width, y)), fill=CUT_LINE_COLOUR, width=2)
         y = y0 + card_height + i * (card_height + gap) + 1
-        draw.line(((0, y - 2), (paper_width, y - 2)), fill=color, width=2)
+        draw.line(((0, y - 2), (paper_width, y - 2)), fill=CUT_LINE_COLOUR, width=2)
 
 def draw_szones(draw: ImageDraw, paper_width, paper_height, hszone, vszone):
     """paper_width, paper_height, hszone, vszone in pxls"""
@@ -115,45 +119,24 @@ def draw_szones(draw: ImageDraw, paper_width, paper_height, hszone, vszone):
         draw.line(((paper_width-vszone-1, 0), (paper_width-vszone-1, paper_height)), fill=color, width=line_width)
 
 def draw_cutting_corners(x: int, y: int, draw: ImageDraw, card_width, card_height):
-    """all in pixels"""
-    color = (0,0,0,47)#"darkgray"
-    X_LEN = 14
-    # upper left corner
-    draw.line(((x - 1, y - 1), 
-            (x + X_LEN, y - 1)), 
-            fill=color, 
-            width=2)
-    draw.line(((x - 1, y - 1), 
-            (x - 1, y + X_LEN)), 
-            fill=color, 
-            width=2)
-    # upper right corner
-    draw.line(((x + card_width - 1, y), 
-            (x + card_width - X_LEN - 1, y)), 
-            fill=color, 
-            width=2)
-    draw.line(((x + card_width - 1, y), 
-            (x + card_width - 1, y + X_LEN)), 
-            fill=color, 
-            width=2)
-    # lower left corner
-    draw.line(((x, y + card_height - 1), 
-            (x + X_LEN, y + card_height - 1)), 
-            fill=color, 
-            width=2)
-    draw.line(((x, y + card_height - 1), 
-            (x, y + card_height - X_LEN - 1)), 
-            fill=color, 
-            width=2)
-    # lower right corner
-    draw.line(((x + card_width, y + card_height), 
-            (x + card_width - X_LEN - 1, y + card_height)), 
-            fill=color, 
-            width=2)
-    draw.line(((x + card_width, y + card_height), 
-            (x + card_width, y + card_height - X_LEN - 1)), 
-            fill=color, 
-            width=2)
+    """Draw L-shaped corner marks in the band just outside a card. All in pixels."""
+    thickness = 2
+    arm = 14
+    # the marks sit in a 2 px band outside the card's pixel box
+    left, top = x - thickness, y - thickness
+    right, bottom = x + card_width + thickness - 1, y + card_height + thickness - 1
+
+    # horizontal arms
+    draw.rectangle((left, top, left + arm, top + thickness - 1), fill=CUT_LINE_COLOUR)
+    draw.rectangle((right - arm, top, right, top + thickness - 1), fill=CUT_LINE_COLOUR)
+    draw.rectangle((left, bottom - thickness + 1, left + arm, bottom), fill=CUT_LINE_COLOUR)
+    draw.rectangle((right - arm, bottom - thickness + 1, right, bottom), fill=CUT_LINE_COLOUR)
+
+    # vertical arms
+    draw.rectangle((left, top, left + thickness - 1, top + arm), fill=CUT_LINE_COLOUR)
+    draw.rectangle((right - thickness + 1, top, right, top + arm), fill=CUT_LINE_COLOUR)
+    draw.rectangle((left, bottom - arm, left + thickness - 1, bottom), fill=CUT_LINE_COLOUR)
+    draw.rectangle((right - thickness + 1, bottom - arm, right, bottom), fill=CUT_LINE_COLOUR)
 
 def create_mirrored_frame(x: int, y: int, sheet: Image, image: Image, gap, card_width, card_height):
     """all in pixels"""
