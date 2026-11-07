@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## Unreleased
+
+### Changed
+
+* Dependencies now require Pillow 13, PySimpleGUI 6.4, pytest 9.2 and
+  PyInstaller 6.22; Python 3.10 is no longer supported (Pillow 13 needs 3.11).
+
 ## [3.0.0] - 2026-11-07
 
 ### Added

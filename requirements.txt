@@ -1,2 +1,2 @@
-Pillow>=10.0
-PySimpleGUI>=5.0
+Pillow>=13.0
+PySimpleGUI>=6.4

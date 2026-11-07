@@ -8,7 +8,7 @@ PnP2PDF (PnP to PDF) is a software that can help you to prepate your PnP cards f
 
 ## Requirements
 
-- Python 3.10 or newer (the code uses `X | Y` type annotations evaluated at import).
+- Python 3.11 or newer (the code uses `X | Y` type annotations evaluated at import).
 - Install the dependencies with:
 
   ```bash
