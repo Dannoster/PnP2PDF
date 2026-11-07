@@ -24,12 +24,103 @@ if [ "$("$PY" -c 'import sys; print(sys.version_info >= (3, 11))')" != "True" ];
     exit 1
 fi
 
-echo "==> Creating the virtual environment in .venv"
-[ -x .venv/bin/python ] && .venv/bin/python -c "" 2>/dev/null || { rm -rf .venv; "$PY" -m venv .venv; }
+venv_python() { printf '%s' ".venv/bin/python"; }
 
-echo "==> Upgrading pip and installing/updating the requirements"
-.venv/bin/python -m pip install --quiet --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt -r requirements-dev.txt
+venv_is_usable() {
+    [ -x "$(venv_python)" ] && "$(venv_python)" -c 'import sys' >/dev/null 2>&1
+}
+
+# macOS can hand us a venv whose interpreter runs under Rosetta while pip
+# fetched arm64 wheels (or the other way round); such a venv can never import
+# compiled packages, so it is rebuilt instead of repaired.
+venv_arch_matches_host() {
+    [ "$(uname -s)" = "Darwin" ] || return 0
+    local host venv
+    host="$(uname -m)"
+    venv="$("$(venv_python)" -c 'import platform; print(platform.machine())' 2>/dev/null || echo unknown)"
+    [ "$host" = "$venv" ]
+}
+
+create_venv() {
+    echo "==> Creating the virtual environment in .venv"
+    rm -rf .venv
+    "$PY" -m venv .venv
+    "$(venv_python)" -m pip install --quiet --upgrade pip
+}
+
+install_requirements() {
+    echo "==> Installing/updating the requirements"
+    "$(venv_python)" -m pip install --quiet -r requirements.txt -r requirements-dev.txt
+}
+
+check_imports() {
+    "$(venv_python)" - <<'PY'
+import importlib, sys
+
+modules = ("PIL.Image", "customtkinter", "pytest", "PyInstaller")
+
+try:
+    import tkinter  # noqa: F401
+    has_tkinter = True
+except (ImportError, OSError):
+    has_tkinter = False
+    print("not checking customtkinter: this system has no tkinter", file=sys.stderr)
+
+broken = []
+for module in modules:
+    if module == "customtkinter" and not has_tkinter:
+        continue
+    try:
+        importlib.import_module(module)
+    except Exception:                # noqa: BLE001 - any failure means "broken"
+        broken.append(module)
+
+for module in broken:
+    print(module)
+if broken:
+    sys.exit(1)
+PY
+}
+
+dist_for_module() {
+    case "$1" in
+        PIL.Image) printf '%s' "Pillow" ;;
+        customtkinter) printf '%s' "customtkinter" ;;
+        pytest) printf '%s' "pytest" ;;
+        PyInstaller) printf '%s' "pyinstaller" ;;
+        *) printf '%s' "$1" ;;
+    esac
+}
+
+repair_imports() {
+    broken="$(check_imports 2>/dev/null)" || true
+    [ -n "$broken" ] || return 0
+    for module in $broken; do
+        dist="$(dist_for_module "$module")"
+        echo "==> $dist cannot be imported ($module) — reinstalling it"
+        "$(venv_python)" -m pip install --quiet --force-reinstall --no-cache-dir "$dist"
+    done
+    check_imports
+}
+
+if ! venv_is_usable || ! venv_arch_matches_host; then
+    create_venv
+fi
+install_requirements
+
+if ! repair_imports; then
+    echo "==> The environment still cannot import its packages — rebuilding .venv from scratch"
+    create_venv
+    install_requirements
+    if ! repair_imports; then
+        echo "Error: pip installed the requirements but they still cannot be imported." >&2
+        echo "Delete .venv and run this script again; if it keeps failing, report it with the output above." >&2
+        exit 1
+    fi
+fi
+
+echo "==> Checking installed packages for conflicts"
+"$(venv_python)" -m pip check || true
 
 if [ "$NO_TESTS" -eq 0 ]; then
     echo "==> Running the test suite"

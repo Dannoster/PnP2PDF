@@ -44,7 +44,8 @@ Build the bundled executable with one command:
 ```
 
 On Windows use `build_app.bat`. Add `--no-tests` to skip the test run. The
-script creates `.venv` and installs or updates the requirements itself.
+script creates `.venv` and installs or updates the requirements itself. It also
+recreates or repairs a broken `.venv` on its own, so no manual cleanup is needed.
 
 ## Command line
 
