@@ -79,6 +79,22 @@ def page_count(sheets, double_sided) -> int:
     return len(sheets) * (2 if double_sided else 1)
 
 
+def _plural(count: int, word: str) -> str:
+    return word if count == 1 else word + "s"
+
+
+def describe(sheets, double_sided) -> str:
+    """A short English summary of what these sheets would produce."""
+    cards = sum(len(sheet.cards) for sheet in sheets)
+    sheets_count = len(sheets)
+    pages = page_count(sheets, double_sided)
+    return (
+        f"{cards} {_plural(cards, 'card')} · "
+        f"{sheets_count} {_plural(sheets_count, 'sheet')} · "
+        f"{pages} {_plural(pages, 'page')}"
+    )
+
+
 def clear_cache() -> None:
     """Forget every cached card picture (call when the folder changes)."""
     _cache.clear()
