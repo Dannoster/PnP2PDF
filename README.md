@@ -33,9 +33,19 @@ Or install the dependencies by hand:
 
 1. [Install Python](https://www.python.org/downloads/)
 2. [Install PIP](https://pip.pypa.io/en/stable/installation/)
-3. Run `pip install PySimpleGUI` in terminal/command line
-4. Run `pip install pillow` in terminal/command line
-5. Open `PnP2PDF.py` file
+3. Run `pip install -r requirements.txt` in terminal/command line
+4. Open `PnP2PDF.py` file
+
+## Building a standalone app
+
+Build the bundled executable with one command:
+
+```bash
+./build_app.sh
+```
+
+On Windows use `build_app.bat`. Add `--no-tests` to skip the test run. The
+script creates `.venv` and installs or updates the requirements itself.
 
 ## Command line
 
