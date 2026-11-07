@@ -9,13 +9,15 @@ from pnp2pdf import __version__ as PROGRAM_VERSION
 
 # Re-exported for backwards compatibility, so that pnp2pdf.app.<name>
 # keeps resolving for code that imports it from here.
-from pnp2pdf.errors import OperationCancelled
+from pnp2pdf.errors import InputError, OperationCancelled
 from pnp2pdf.model import Card, CardBack, Sheet
 from pnp2pdf.pdf import PdfFile
 from pnp2pdf.cards import (
     IMAGE_EXTENSIONS, create_cards, find_back_dirs, find_card_dirs, natural_key,
 )
 from pnp2pdf.layout import create_sheets
+from pnp2pdf.options import JobOptions
+from pnp2pdf.job import create_pdf
 from pnp2pdf.render import (
     CUT_LINE_COLOUR, PXLS_IN_MM, create_mirrored_frame, draw_cutting_corners,
     draw_lines, draw_szones, place_cropped_back,
@@ -25,22 +27,9 @@ from pnp2pdf.settings import DEFAULT_SETTINGS, create_save, load_save
 
 
 def build_pdf(values: dict, progress=None, cancelled=None) -> str:
-    cards = create_cards(values['-CFOLDER-'],
-                         float(values['-CWIDTH-'].replace(',', '.')),
-                         float(values['-CHEIGHT-'].replace(',', '.')),
-                         values["-SIZECHECKBOX-"],
-                         values['-DOUBLECHECKBOX-'])
-    sheets = create_sheets(cards,
-                           float(values['-PWIDTH-'].replace(',', '.')),
-                           float(values['-PHEIGHT-'].replace(',', '.')),
-                           int(values['-ROWS-']),
-                           int(values['-COLUMNS-']),
-                           float(values['-GAP-'].replace(',', '.')),
-                           float(values['-HSZONES-'].replace(',', '.')),
-                           float(values['-VSZONES-'].replace(',', '.')))
-    pdf = PdfFile(sheets)
-    return pdf.save(values['-PDFFOLDER-'], values['-DOUBLECHECKBOX-'],
-                    progress=progress, cancelled=cancelled)
+    """Translate the window's widget values into a job and run it."""
+    return create_pdf(JobOptions.from_form(values), progress=progress,
+                      cancelled=cancelled)
 
 
 def ui_window(settings: dict):
