@@ -22,7 +22,7 @@ from pnp2pdf.render import (
     CUT_LINE_COLOUR, PXLS_IN_MM, create_mirrored_frame, draw_cutting_corners,
     draw_lines, draw_szones, place_cropped_back,
 )
-from pnp2pdf.resources import ICC_DIR, curr_path, icc_profile
+from pnp2pdf.resources import icc_profile, resource_path, settings_path
 from pnp2pdf.settings import DEFAULT_SETTINGS, create_save, load_save
 
 
@@ -82,7 +82,7 @@ def ui_window(settings: dict):
                   sg.Push(), sg.Text(f"v{PROGRAM_VERSION}")]
                 ]
 
-    window = sg.Window('PnP2PDF', form_rows, icon="icon.png")
+    window = sg.Window('PnP2PDF', form_rows, icon=resource_path("icon.png"))
 
     cancel_event = threading.Event()
     worker = None
@@ -149,7 +149,7 @@ def ui_window(settings: dict):
 
         
 def main():
-    save_folder = os.path.join(curr_path, "presets.json")
+    save_folder = settings_path()
     settings = load_save(save_folder)
     ui_output = ui_window(settings)
     if ui_output != "Window closed":
