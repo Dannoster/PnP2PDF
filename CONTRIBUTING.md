@@ -66,3 +66,12 @@ State in the commit or PR what you ran. "Not tested on Windows/macOS" is a valid
 - Keep them focused; one concern per pull request
 - Reference the issue it resolves with `Closes #<number>`
 - Screenshots of a changed layout are welcome
+
+## Running the tests
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest
+```
+
+The suite stubs PySimpleGUI, so no display and no GUI licence are needed.

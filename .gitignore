@@ -5,4 +5,5 @@ build/
 /.DS_Store
 color_profiles/.DS_Store
 __pycache__/
+.pytest_cache/
 *.pyc
