@@ -6,11 +6,13 @@ on machines without Tk, so it must not touch ``tkinter`` at import time. Every
 """
 
 import queue
+import sys
 import webbrowser
 
 import customtkinter as ctk
 
 from pnp2pdf import __version__ as PROGRAM_VERSION
+from pnp2pdf.crash import install_handlers, log_exception, log_message, log_path
 from pnp2pdf.errors import InputError
 from pnp2pdf.options import JobOptions
 from pnp2pdf.resources import resource_path, settings_path
@@ -107,6 +109,8 @@ class PnP2PDFWindow(ctk.CTk):
         self._page_index = 0
 
         self._build_ui(settings)
+        self._log_path = log_path()
+        self.report_callback_exception = self._report_callback_exception
         if self._entries["-PDFFOLDER-"].get().strip():
             self._output_switch.select()
             self._toggle_output_folder()
@@ -432,44 +436,57 @@ class PnP2PDFWindow(ctk.CTk):
     # -- build job -------------------------------------------------------
 
     def _run(self):
-        if self._job is not None and self._job.is_running():
-            return
         try:
-            options = JobOptions.from_form(self.values())
-            options.validate()
-        except InputError as error:
-            self._show_error(str(error))
-            return
+            if self._job is not None and self._job.is_running():
+                return
+            try:
+                options = JobOptions.from_form(self.values())
+                options.validate()
+            except InputError as error:
+                self._show_error(str(error))
+                return
 
-        self._run_button.configure(state="disabled")
-        self._cancel_button.configure(state="normal")
-        self._status.configure(text="")
-        self._progress.set(0)
+            self._run_button.configure(state="disabled")
+            self._cancel_button.configure(state="normal")
+            self._status.configure(text="")
+            self._progress.set(0)
 
-        self._job = BuildJob(
-            options, lambda name, payload: self._build_events.put((name, payload)))
-        self._job.start()
+            self._job = BuildJob(
+                options,
+                lambda name, payload: self._build_events.put((name, payload)))
+            self._job.start()
+        except Exception:
+            self._log_failure("start a build")
 
     def _drain_build(self):
-        while True:
-            try:
-                name, payload = self._build_events.get_nowait()
-            except queue.Empty:
-                break
-            if name == "progress":
-                done, total, text = payload
-                self._progress.set(done / total if total else 0)
-                self._status.configure(text=text)
-            elif name == "done":
-                self.result = self.values()
-                self._close()
-            elif name == "error":
-                self._finish_run()
-                self._status.configure(text="Failed")
-                self._show_error(payload)
-            elif name == "cancelled":
-                self._finish_run()
-                self._status.configure(text="Cancelled")
+        try:
+            while True:
+                try:
+                    name, payload = self._build_events.get_nowait()
+                except queue.Empty:
+                    break
+                if name == "progress":
+                    done, total, text = payload
+                    self._progress.set(done / total if total else 0)
+                    self._status.configure(text=text)
+                elif name == "done":
+                    self.result = self.values()
+                    self._close()
+                elif name == "error":
+                    self._finish_run()
+                    self._status.configure(text="Failed")
+                    self._show_error(payload)
+                elif name == "cancelled":
+                    self._finish_run()
+                    self._status.configure(text="Cancelled")
+        except Exception:
+            self._finish_run()
+            self._log_failure("event pump")
+
+    def _log_failure(self, where):
+        path = log_exception(where, *sys.exc_info())
+        self._status.configure(text=f"Failed — details were written to {path}")
+        return path
 
     def _finish_run(self):
         self._run_button.configure(state="normal")
@@ -482,9 +499,17 @@ class PnP2PDFWindow(ctk.CTk):
         self._cancel_button.configure(state="disabled")
         self._status.configure(text="Cancelling…")
 
+    def _report_callback_exception(self, *args):
+        log_exception("tk callback", *sys.exc_info())
+        error = sys.exc_info()[1]
+        self._show_error(str(error) if error else "An unexpected error occurred.")
+
     def _show_error(self, message):
         from tkinter import messagebox
 
+        path = getattr(self, "_log_path", None)
+        if path:
+            message = f"{message}\n\nDetails were written to {path}"
         messagebox.showerror("PnP2PDF", message)
 
     # -- life cycle ------------------------------------------------------
@@ -512,7 +537,12 @@ def ui_window(settings: dict):
 
 
 def main():
+    log_file = install_handlers()
     save_folder = settings_path()
+    log_message(
+        f"PnP2PDF {PROGRAM_VERSION} starting | "
+        f"frozen={getattr(sys, 'frozen', False)} | "
+        f"settings={save_folder} | log={log_file}")
     settings = load_save(save_folder)
     ui_output = ui_window(settings)
     if ui_output != "Window closed":

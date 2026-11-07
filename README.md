@@ -107,6 +107,18 @@ on macOS and `%APPDATA%\PnP2PDF` on Windows when running the packaged app; on
 Linux they go to `$XDG_DATA_HOME/pnp2pdf` (or `~/.local/share/pnp2pdf`). Running
 from source keeps `presets.json` next to the project.
 
+## Something went wrong?
+
+If PnP2PDF crashes, the traceback is written to `crash.log` in the application
+data directory, alongside `presets.json`:
+
+- macOS: `~/Library/Application Support/PnP2PDF/crash.log`
+- Windows: `%APPDATA%\PnP2PDF\crash.log`
+- Linux: `$XDG_DATA_HOME/pnp2pdf/crash.log` (or `~/.local/share/pnp2pdf/crash.log`)
+
+The error dialog names the exact path; please send that file when reporting a
+problem.
+
 ## Known issues
 
 * Windows version shows error after closing a program (doesn't affect work).

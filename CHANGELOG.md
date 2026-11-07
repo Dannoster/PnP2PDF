@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - the window is now built with CustomTkinter and shows a live preview panel of the sheets being assembled
 - the app bundle now carries a real version number instead of `0.0.0`
+- crashes are written to a log file in the application data directory
 
 ### Changed
 - the window no longer depends on PySimpleGUI; `customtkinter` replaces it
