@@ -1,6 +1,8 @@
 dist/
 build/
 /PnP2PDF.spec
-/presets.pickle
+/presets.json
 /.DS_Store
 color_profiles/.DS_Store
+__pycache__/
+*.pyc

@@ -3,6 +3,17 @@ What is it?
 
 PnP2PDF (PnP to PDF) is a software that can help you to prepate your PnP cards for printing. The program helps you to assemble a PDF file from images of individual cards, double-sided cards are also supported.
 
+## Requirements
+
+- Python 3.10 or newer (the code uses `X | Y` type annotations evaluated at import).
+- Install the dependencies with:
+
+  ```bash
+  pip install -r requirements.txt
+  ```
+
+- Run with `python PnP2PDF.py`.
+
 # Download and Setup
 [MacOS Version](https://drive.google.com/drive/folders/1fADjKJbXosjtHfRhAyEQ-Opt4FbnRdQ7?usp=sharing)
 

@@ -4,7 +4,8 @@
 
 import os
 import webbrowser
-import pickle
+import json
+import re
 import datetime
 # pip install PySimpleGUI
 # pip install pillow
@@ -27,6 +28,13 @@ DEFAULT_SETTINGS = {"paper_width"   : 210,
             "cards_folder"  : "",
             "save_to"       : ""}
 curr_path = os.path.dirname(os.path.realpath(__file__))
+ICC_DIR = os.path.join(curr_path, "color_profiles")
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".tif", ".tiff")
+
+
+def icc_profile(name: str) -> str:
+    """Absolute path to a bundled ICC profile (works regardless of CWD)."""
+    return os.path.join(ICC_DIR, name)
 
 class CardBack:
     def __init__(self, dir: str, width: float, height: float):
@@ -180,95 +188,88 @@ class PDF_file:
     def __init__(self, sheets: list[Sheet]):
         self.sheets = sheets
 
-    def save(self, dir: str, smaller_size: bool, double_sided: bool, format="jpeg"): # need changes
+    def save(self, folder: str, double_sided: bool):
 
-        time = datetime.datetime.today().strftime("%d%m%y_%H%M")
-        if not os.path.exists(f"{dir}/{time}"):
-            try:
-                os.mkdir(f"{dir}/{time}")
-            except:
-                os.mkdir(f"{dir}")
-                os.mkdir(f"{dir}/{time}")
+        stamp = datetime.datetime.today().strftime("%d%m%y_%H%M")
+        outdir = os.path.join(folder, stamp)
+        counter = 2
+        while os.path.exists(outdir):
+            outdir = os.path.join(folder, f"{stamp}_{counter}")
+            counter += 1
+        os.makedirs(outdir, exist_ok=True)
 
         sht = self.sheets[0]
         crd = sht.cards[0]
         swidth, sheight = int(sht.width*PXLS_IN_MM), int(sht.height*PXLS_IN_MM)
-        hszone, vszone  = int(sht.ud_szone*PXLS_IN_MM), int(sht.lr_szone*PXLS_IN_MM), 
+        hszone, vszone = int(sht.ud_szone*PXLS_IN_MM), int(sht.lr_szone*PXLS_IN_MM)
         cwidth, cheight = int(crd.width*PXLS_IN_MM), int(crd.height*PXLS_IN_MM)
         rows, columns, gap = sht.rows, sht.columns, int(sht.gap*PXLS_IN_MM)
         x0 = (swidth - (columns-1)*gap - columns*cwidth) // 2
         y0 = (sheight - (rows-1)*gap - rows*cheight) // 2
 
+        pages = []
         for i, sheet in enumerate(self.sheets):
-            page_a = Image.new('CMYK',#'RGB', 
-                               (int(sheet.width*PXLS_IN_MM),int(sheet.height*PXLS_IN_MM)), 
-                               (0,0,0,0))#(255,255,255))
+            page_a = Image.new('CMYK',
+                               (int(sheet.width*PXLS_IN_MM), int(sheet.height*PXLS_IN_MM)),
+                               (0, 0, 0, 0))
             draw_a = ImageDraw.Draw(page_a)
-            draw_lines(draw_a, swidth, sheight, rows, columns, gap, 
+            draw_lines(draw_a, swidth, sheight, rows, columns, gap,
                        cwidth, cheight, number_of_cards=len(sheet.cards))
             for j, card in enumerate(sheet.cards):
-                card_image = Image.open(card.dir).resize((int(card.width*PXLS_IN_MM), 
+                card_image = Image.open(card.dir).resize((int(card.width*PXLS_IN_MM),
                                                           int(card.height*PXLS_IN_MM)))
                 try:
-                    card_image = ImageCms.profileToProfile(card_image, 
-                                                           'color_profiles/sRGB-IEC61966-2.1.icc', 
-                                                           'color_profiles/USWebCoatedSWOP.icc', 
+                    card_image = ImageCms.profileToProfile(card_image,
+                                                           icc_profile("sRGB-IEC61966-2.1.icc"),
+                                                           icc_profile("USWebCoatedSWOP.icc"),
                                                            outputMode='CMYK')
-                except:
-                    pass
-                # print(card.dir.split("/")[-1], card_image.mode, card_image.load()[0,0])
+                except Exception as error:
+                    print(f"WARNING: colour profile not applied to "
+                          f"{os.path.basename(card.dir)}: {error}")
                 x = x0 + j%columns * (cwidth + gap)
                 y = y0 + j//columns * (cheight + gap)
                 page_a.paste(card_image, (x, y))
                 create_mirrored_frame(x, y, page_a, card_image, gap, cwidth, cheight)
                 draw_cutting_corners(x, y, draw_a, cwidth, cheight)
             draw_szones(draw_a, swidth, sheight, hszone, vszone)
-            
-            savedir = f"{dir}/{time}/{time}_page_{i+1:03}"
+            pages.append(page_a)
+
             if double_sided:
-                savedir += "a"
-            savedir += f".{format}"
-            page_a.save(savedir, dpi=(300, 300), compression=None, quality=100)
-            page_a.close()
-        
-        if double_sided:
-            for i, sheet in enumerate(self.sheets):            
-                page_b = Image.new('CMYK',#'RGB', 
-                                   (int(sheet.width*PXLS_IN_MM),int(sheet.height*PXLS_IN_MM)), 
-                                   (0,0,0,0))#(255,255,255))
-                
+                page_b = Image.new('CMYK',
+                                   (int(sheet.width*PXLS_IN_MM), int(sheet.height*PXLS_IN_MM)),
+                                   (0, 0, 0, 0))
                 for j, card in enumerate(sheet.cards):
                     if card.back:
-                        back_image = Image.open(card.back.dir).resize((int(card.back.width*PXLS_IN_MM),
-                                                                       int(card.back.height*PXLS_IN_MM)))
+                        back_image = Image.open(card.back.dir).resize(
+                            (int(card.back.width*PXLS_IN_MM),
+                             int(card.back.height*PXLS_IN_MM)))
                         try:
-                            back_image = ImageCms.profileToProfile(back_image, 
-                                                                   'color_profiles/sRGB-IEC61966-2.1.icc', 
-                                                                   'color_profiles/USWebCoatedSWOP.icc', 
+                            back_image = ImageCms.profileToProfile(back_image,
+                                                                   icc_profile("sRGB-IEC61966-2.1.icc"),
+                                                                   icc_profile("USWebCoatedSWOP.icc"),
                                                                    outputMode='CMYK')
-                        except: 
-                            pass
+                        except Exception as error:
+                            print(f"WARNING: colour profile not applied to "
+                                  f"{os.path.basename(card.back.dir)}: {error}")
                         x = x0 + (columns-1-j)%columns * (cwidth + gap)
                         y = y0 + j//columns * (cheight + gap)
                         if card.back.width == card.width and card.back.height == card.height:
                             page_b.paste(back_image, (x, y))
-                            create_mirrored_frame(x, y, page_b, back_image, gap, 
-                                                  int(card.back.width*PXLS_IN_MM), 
-                                                  int(card.back.height*PXLS_IN_MM))  
+                            create_mirrored_frame(x, y, page_b, back_image, gap,
+                                                  int(card.back.width*PXLS_IN_MM),
+                                                  int(card.back.height*PXLS_IN_MM))
                         else:
                             place_cropped_back(x, y, page_b, back_image, gap, cwidth, cheight,
-                                               int(card.back.width*PXLS_IN_MM), 
+                                               int(card.back.width*PXLS_IN_MM),
                                                int(card.back.height*PXLS_IN_MM))
+                pages.append(page_b)
 
-                page_b.save(f"{dir}/{time}/{time}_page_{i+1:03}b.{format}", 
-                            dpi=(300, 300), compression=None, quality=100)
-                page_b.close()
-                
-        pages_dirs = sorted(os.listdir(f"{dir}/{time}"))
-        pages = [Image.open(f"{dir}/{time}/{directory}") for directory in pages_dirs]
-        pages[0].save(f"{dir}/{time}/{time}.pdf", "PDF", optimize=False, 
-                        save_all=True, append_images=pages[1:], 
-                        dpi=(300, 300), compression=None, quality=100)
+        pdf_path = os.path.join(outdir, f"{os.path.basename(outdir)}.pdf")
+        pages[0].save(pdf_path, "PDF", optimize=False,
+                      save_all=True, append_images=pages[1:],
+                      dpi=(300, 300), compression=None, quality=100)
+        for page in pages:
+            page.close()
 
             
             
@@ -276,38 +277,55 @@ class PDF_file:
 
 
 
-def load_save(dir: str) -> dict:
-    if os.path.exists(dir):
-        with open(dir, "rb") as file:
-            return pickle.load(file)
-    else:
-        return DEFAULT_SETTINGS
+def load_save(path: str) -> dict:
+    """Read settings from JSON, filling in any key missing from an older file."""
+    settings = dict(DEFAULT_SETTINGS)
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as file:
+                stored = json.load(file)
+        except (OSError, ValueError) as error:
+            print(f"WARNING: could not read settings from {path}: {error}")
+            stored = {}
+        if isinstance(stored, dict):
+            for key in DEFAULT_SETTINGS:
+                if key in stored:
+                    settings[key] = stored[key]
+    return settings
 
-def create_save(dir: str, save: dict):
-    with open(dir, 'wb') as file:     
-        pickle.dump(save, file)
+
+def create_save(path: str, save: dict):
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(save, file, indent=2, ensure_ascii=False)
+
+def natural_key(name: str) -> list:
+    """Sort key that orders 1, 2, ..., 10 instead of 1, 10, 2."""
+    parts = re.split(r"(\d+)", os.path.basename(name).lower())
+    return [int(part) if part.isdigit() else part for part in parts]
 
 def find_back_dirs(folder: str) -> list[str]:
     back_dirs = []
     for file in os.listdir(folder):
-        if file.lower().endswith(".jpg") or file.lower().endswith(".jpeg") \
-                or file.lower().endswith(".png") or file.lower().endswith(".tif"):
+        if file.lower().endswith(IMAGE_EXTENSIONS):
             back_dirs.append(os.path.join(folder, file))
-    back_dirs.sort()
+    back_dirs.sort(key=natural_key)
     return back_dirs
 
 def find_card_dirs(folder):
     card_dirs = []
     for path, subdirs, files in os.walk(folder):
         for name in files:
-            if ".jpg" in name.lower() or ".jpeg" in name.lower() \
-                    or ".png" in name.lower() or ".tif" in name.lower():
-                if not "page_" in name:
-                    card_dirs.append(f"{path}/{name}")
-    card_dirs.sort()
+            if name.lower().endswith(IMAGE_EXTENSIONS) and "page_" not in name:
+                card_dirs.append(os.path.join(path, name))
+    card_dirs.sort(key=natural_key)
     return card_dirs
 
 def create_cards(root_folder, card_width, card_height, smaller_size: bool, double_sided: bool):
+
+    if card_width <= 0 or card_height <= 0:
+        raise ValueError(
+            f"Card size must be positive (got {card_width} x {card_height} mm)."
+        )
 
     if smaller_size:
         koef = .98
@@ -324,42 +342,67 @@ def create_cards(root_folder, card_width, card_height, smaller_size: bool, doubl
         backs = []
         for dir in find_back_dirs(root_folder):
             try:
-                back = CardBack(dir, 
-                                koef * float(dir.split("_")[-2].replace(',','.')),
-                                koef * float("".join(dir.split("_")[-1].split(".")[:-1]).replace(',','.')))
-            except:
+                stem = os.path.splitext(os.path.basename(dir))[0]
+                parts = stem.split("_")
+                back = CardBack(dir,
+                                koef * float(parts[-2].replace(',', '.')),
+                                koef * float(parts[-1].replace(',', '.')))
+            except (IndexError, ValueError):
                 back = CardBack(dir, card_width, card_height)
             backs.append(back)
 
         for back in backs:
-            folder_name = back.dir.split("/")[-1].split("_")[0].split(".")[0]
-            card_dirs = find_card_dirs(f"{root_folder}/{folder_name}")
+            folder_name = os.path.basename(back.dir).split("_")[0].split(".")[0]
+            card_dirs = find_card_dirs(os.path.join(root_folder, folder_name))
             cards = [Card(dir, card_width, card_height, back) for dir in card_dirs]
             all_cards.extend(cards)
 
-        double_card_dirs = find_card_dirs(f"{root_folder}/Double Sided")
+        double_card_dirs = find_card_dirs(os.path.join(root_folder, "Double Sided"))
+        if len(double_card_dirs) % 2 != 0:
+            raise ValueError(
+                f'Found an odd number of files ({len(double_card_dirs)}) in '
+                f'"{os.path.join(root_folder, "Double Sided")}".\n'
+                'Files in that folder are paired in sorted order as front, back, '
+                'front, back, ... - add or remove one file so the count is even.'
+            )
         for i in range(0, len(double_card_dirs), 2):
             back = CardBack(double_card_dirs[i+1], card_width, card_height)
             all_cards.append(Card(double_card_dirs[i], card_width, card_height, back))
-        single_side_folder += "/Single Sided"
+        single_side_folder = os.path.join(single_side_folder, "Single Sided")
 
     single_cards = [Card(dir, card_width, card_height) for dir in find_card_dirs(single_side_folder)]
     all_cards.extend(single_cards)
-    all_cards.sort(key=lambda x: x.dir.split("/")[-1])
+    all_cards.sort(key=lambda card: natural_key(card.dir))
+
+    if not all_cards:
+        raise ValueError(
+            f"No card images found in \"{root_folder}\".\n"
+            "Supported formats: .png, .jpg, .jpeg, .tif"
+        )
 
     return all_cards
 
 def create_sheets(cards: list[Card|CardBack], sheet_width: float, sheet_height: float, 
                   rows: int, columns: int, gap: int, ud_szone: int, lr_szone: int):
-    # if len(cards) % (rows*columns) == 0:    
-    #     sheets_total = len(cards) // (rows*columns)
-    # else:
-    #     sheets_total = len(cards) // (rows*columns) + 1
-    
+    if rows < 1 or columns < 1:
+        raise ValueError(
+            f"Rows and columns must be at least 1 (got {rows} rows, "
+            f"{columns} columns)."
+        )
+    if sheet_width <= 0 or sheet_height <= 0:
+        raise ValueError(
+            f"Paper size must be positive (got {sheet_width} x {sheet_height} mm)."
+        )
+    if gap < 0 or ud_szone < 0 or lr_szone < 0:
+        raise ValueError(
+            f"Gap and margins must not be negative (got gap={gap}, "
+            f"top/bottom={ud_szone}, left/right={lr_szone} mm)."
+        )
+    remaining = list(cards)
     sheets = []
-    while cards:
-        selected_cards = cards[:rows*columns]
-        del cards[:rows*columns]
+    while remaining:
+        selected_cards = remaining[:rows*columns]
+        del remaining[:rows*columns]
         sheet = Sheet(sheet_width, sheet_height, rows, columns, gap, ud_szone, lr_szone, selected_cards)
         sheets.append(sheet)
     
@@ -424,30 +467,32 @@ def ui_window(settings: dict):
             url = event.split(' ')[1]
             webbrowser.open(url)
         elif event.startswith("Create PDF"):
-            cards = create_cards(values['-CFOLDER-'], 
-                                 float(values['-CWIDTH-'].replace(',','.')), 
-                                 float(values['-CHEIGHT-'].replace(',','.')),
-                                 values["-SIZECHECKBOX-"],
-                                 values['-DOUBLECHECKBOX-'])
-            sheets = create_sheets(cards, 
-                                   float(values['-PWIDTH-'].replace(',','.')), 
-                                   float(values['-PHEIGHT-'].replace(',','.')), 
-                                   int(values['-ROWS-']), 
-                                   int(values['-COLUMNS-']), 
-                                   float(values['-GAP-'].replace(',','.')), 
-                                   float(values['-HSZONES-'].replace(',','.')), 
-                                   float(values['-VSZONES-'].replace(',','.')))
-            pdf = PDF_file(sheets)
-            pdf.save(values['-PDFFOLDER-'],
-                     values["-SIZECHECKBOX-"], # added recently
-                     values['-DOUBLECHECKBOX-'])
-            window.close()
-            return values
+            try:
+                cards = create_cards(values['-CFOLDER-'], 
+                                     float(values['-CWIDTH-'].replace(',','.')), 
+                                     float(values['-CHEIGHT-'].replace(',','.')),
+                                     values["-SIZECHECKBOX-"],
+                                     values['-DOUBLECHECKBOX-'])
+                sheets = create_sheets(cards, 
+                                       float(values['-PWIDTH-'].replace(',','.')), 
+                                       float(values['-PHEIGHT-'].replace(',','.')), 
+                                       int(values['-ROWS-']), 
+                                       int(values['-COLUMNS-']), 
+                                       float(values['-GAP-'].replace(',','.')), 
+                                       float(values['-HSZONES-'].replace(',','.')), 
+                                       float(values['-VSZONES-'].replace(',','.')))
+                pdf = PDF_file(sheets)
+                pdf.save(values['-PDFFOLDER-'], values['-DOUBLECHECKBOX-'])
+                window.close()
+                return values
+            except Exception as error:
+                sg.popup_error(f"Could not create the PDF:\n\n{error}")
+                continue
             
         
         
 def main():
-    save_folder = "presets.pickle"
+    save_folder = os.path.join(curr_path, "presets.json")
     settings = load_save(save_folder)
     ui_output = ui_window(settings)
     if ui_output != "Window closed":
@@ -466,4 +511,6 @@ def main():
                     "save_to"       : ui_output['-PDFFOLDER-']}
         create_save(save_folder, settings)
 
-main()
+
+if __name__ == "__main__":
+    main()
