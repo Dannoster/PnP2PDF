@@ -1,7 +1,7 @@
 """Small, fast pictures of pages.
 
 This module deliberately has no GUI imports: the window can ask it for a
-preview without paying for (or depending on) PySimpleGUI.
+preview without paying for (or depending on) the GUI toolkit.
 """
 
 import math

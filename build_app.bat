@@ -40,7 +40,7 @@ if not defined NO_TESTS (
 
 if defined PNP2PDF_BUILD_DRY (
     echo ==^> Dry run: PyInstaller command that would run
-    echo .venv\Scripts\pyinstaller --noconfirm --clean --windowed --name PnP2PDF --add-data "pnp2pdf/color_profiles/sRGB-IEC61966-2.1.icc;color_profiles" --add-data "pnp2pdf/color_profiles/USWebCoatedSWOP.icc;color_profiles" --add-data "pnp2pdf/icon.png;." --icon=pnp2pdf/icon.png PnP2PDF.py
+    echo .venv\Scripts\pyinstaller --noconfirm --clean --windowed --name PnP2PDF --collect-data customtkinter --collect-submodules customtkinter --add-data "pnp2pdf/color_profiles/sRGB-IEC61966-2.1.icc;color_profiles" --add-data "pnp2pdf/color_profiles/USWebCoatedSWOP.icc;color_profiles" --add-data "pnp2pdf/icon.png;." --icon=pnp2pdf/icon.png PnP2PDF.py
     exit /b 0
 )
 
@@ -50,6 +50,8 @@ if exist dist rmdir /s /q dist
 
 echo ==^> Running PyInstaller
 ".venv\Scripts\pyinstaller.exe" --noconfirm --clean --windowed --name PnP2PDF ^
+    --collect-data customtkinter ^
+    --collect-submodules customtkinter ^
     --add-data "pnp2pdf/color_profiles/sRGB-IEC61966-2.1.icc;color_profiles" ^
     --add-data "pnp2pdf/color_profiles/USWebCoatedSWOP.icc;color_profiles" ^
     --add-data "pnp2pdf/icon.png;." ^

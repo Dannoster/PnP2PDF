@@ -41,6 +41,8 @@ PYINSTALLER_ARGS=(
     --clean
     --windowed
     --name PnP2PDF
+    --collect-data customtkinter
+    --collect-submodules customtkinter
     --add-data "pnp2pdf/color_profiles/sRGB-IEC61966-2.1.icc:color_profiles"
     --add-data "pnp2pdf/color_profiles/USWebCoatedSWOP.icc:color_profiles"
     --add-data "pnp2pdf/icon.png:."
@@ -63,7 +65,13 @@ echo "==> Running PyInstaller"
 .venv/bin/pyinstaller "${PYINSTALLER_ARGS[@]}" PnP2PDF.py
 
 if [ "$(uname -s)" = "Darwin" ]; then
-    echo "==> Built dist/PnP2PDF.app"
+    echo "==> Setting the bundle version from pyproject.toml"
+    VERSION="$("$PY" -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
+    plutil -replace CFBundleShortVersionString -string "$VERSION" \
+        dist/PnP2PDF.app/Contents/Info.plist
+    plutil -replace CFBundleVersion -string "$VERSION" \
+        dist/PnP2PDF.app/Contents/Info.plist
+    echo "==> Built dist/PnP2PDF.app ($VERSION)"
     echo "    Launch it with: open dist/PnP2PDF.app"
 else
     echo "==> Built dist/PnP2PDF/PnP2PDF"

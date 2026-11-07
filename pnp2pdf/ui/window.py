@@ -1,128 +1,477 @@
+"""CustomTkinter window with a live preview panel.
+
+The module is imported by the test suite through a stub ``customtkinter`` and
+on machines without Tk, so it must not touch ``tkinter`` at import time. Every
+``tkinter`` use (file dialogs, message boxes) happens inside a method.
+"""
+
+import queue
 import webbrowser
 
-import PySimpleGUI as sg
+import customtkinter as ctk
 
 from pnp2pdf import __version__ as PROGRAM_VERSION
+from pnp2pdf.errors import InputError
 from pnp2pdf.options import JobOptions
 from pnp2pdf.resources import resource_path, settings_path
 from pnp2pdf.settings import create_save, load_save
+from pnp2pdf.ui import form
 from pnp2pdf.ui.job_runner import BuildJob
+from pnp2pdf.ui.preview_controller import PreviewController
+
+CONTACT_URL = "https://www.t.me/nNekoChan"
+GUIDE_URL = ("https://github.com/Dannoster/PnP2PDF/tree/main"
+             "#how-to-prepare-double-sided-cards")
+
+PAPER_PRESETS = {
+    "A4 210×297": (210, 297),
+    "A3 297×420": (297, 420),
+    "Letter 216×279": (216, 279),
+    "Legal 216×356": (216, 356),
+}
+
+_ENTRY_KEYS = [
+    "-PWIDTH-", "-PHEIGHT-", "-CWIDTH-", "-CHEIGHT-",
+    "-ROWS-", "-COLUMNS-", "-GAP-", "-HSZONES-", "-VSZONES-",
+    "-CFOLDER-", "-PDFFOLDER-",
+]
+
+_PREVIEW_WIDTH = 390
+_PREVIEW_PICTURE_WIDTH = 340
+_PREVIEW_PICTURE_HEIGHT = 420
+_THUMB_WIDTH = 62
+_THUMB_HEIGHT = 88
+
+_GREY = ("gray40", "gray70")
+_ERROR = ("#b23a2e", "#e06c5a")
+
+
+def _section(parent, title):
+    """A rounded card holding a bold header; returns the frame for the body."""
+    card = ctk.CTkFrame(parent, corner_radius=12)
+    card.pack(fill="x", pady=(0, 10))
+    header = ctk.CTkLabel(card, text=title,
+                          font=ctk.CTkFont(size=13, weight="bold"))
+    header.pack(anchor="w", padx=14, pady=(12, 6))
+    body = ctk.CTkFrame(card, fg_color="transparent")
+    body.pack(fill="x", padx=14, pady=(0, 12))
+    return body
+
+
+def _entry(parent, key, value, width=6):
+    """A fixed-width text entry pre-filled with ``value``."""
+    entry = ctk.CTkEntry(parent, width=max(60, width * 12),
+                         font=ctk.CTkFont(size=12))
+    entry.insert(0, str(value))
+    return entry
+
+
+def _fit_size(image, max_width, max_height):
+    """Fit a PIL image into the box while keeping its aspect ratio."""
+    width, height = image.size
+    if not width or not height:
+        return (max_width, max_height)
+    scale = min(max_width / width, max_height / height)
+    return (max(1, int(width * scale)), max(1, int(height * scale)))
+
+
+class PnP2PDFWindow(ctk.CTk):
+    """The one window: settings on the left, a live preview on the right."""
+
+    def __init__(self, settings: dict):
+        super().__init__()
+        self.title("PnP2PDF")
+        self.geometry("1080x720")
+        self.minsize(1000, 680)
+        try:
+            self.iconbitmap(resource_path("icon.png"))
+        except Exception:
+            pass
+
+        self.result = "Window closed"
+        self._closed = False
+        self._entries = {}
+        self._job = None
+        self._build_events = queue.Queue()
+        self._preview = PreviewController()
+        self._preview_pending = False
+        self._page_views = []
+        self._page_thumbs = []
+        self._thumb_buttons = []
+        self._page_index = 0
+
+        self._build_ui(settings)
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.after(100, self._tick)
+        self._schedule_preview()
+
+    # -- construction ---------------------------------------------------
+
+    def _build_ui(self, settings):
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=0, minsize=_PREVIEW_WIDTH)
+        self.grid_rowconfigure(0, weight=1)
+
+        left = ctk.CTkScrollableFrame(self, corner_radius=0,
+                                      fg_color="transparent")
+        left.grid(row=0, column=0, sticky="nsew", padx=(12, 6), pady=12)
+
+        right = ctk.CTkFrame(self, width=_PREVIEW_WIDTH, corner_radius=12)
+        right.grid(row=0, column=1, sticky="nsew", padx=(6, 12), pady=12)
+
+        self._build_left(left, settings)
+        self._build_preview(right)
+
+        bottom = ctk.CTkFrame(self, fg_color="transparent")
+        bottom.grid(row=1, column=0, columnspan=2, sticky="ew",
+                    padx=12, pady=(0, 12))
+        self._build_bottom(bottom)
+
+    def _register_entry(self, key, value, parent, width=6):
+        entry = _entry(parent, key, value, width)
+        entry.bind("<KeyRelease>", lambda event: self._schedule_preview())
+        self._entries[key] = entry
+        return entry
+
+    def _build_left(self, parent, settings):
+        initial = form.initial_values(settings)
+
+        paper = _section(parent, "Paper")
+        row = ctk.CTkFrame(paper, fg_color="transparent")
+        row.pack(fill="x")
+        self._register_entry("-PWIDTH-", initial["-PWIDTH-"], row).pack(side="left")
+        ctk.CTkLabel(row, text="×").pack(side="left", padx=6)
+        self._register_entry("-PHEIGHT-", initial["-PHEIGHT-"], row).pack(side="left")
+        ctk.CTkLabel(row, text="mm").pack(side="left", padx=6)
+        preset = ctk.CTkOptionMenu(paper, values=list(PAPER_PRESETS),
+                                   command=self._apply_preset)
+        preset.pack(fill="x", pady=(8, 0))
+        preset.set("Presets")
+
+        cards = _section(parent, "Cards")
+        row = ctk.CTkFrame(cards, fg_color="transparent")
+        row.pack(fill="x")
+        self._register_entry("-CWIDTH-", initial["-CWIDTH-"], row).pack(side="left")
+        ctk.CTkLabel(row, text="×").pack(side="left", padx=6)
+        self._register_entry("-CHEIGHT-", initial["-CHEIGHT-"], row).pack(side="left")
+        ctk.CTkLabel(row, text="mm").pack(side="left", padx=6)
+        self._size_check = ctk.CTkCheckBox(cards, text="Smaller size (98%)",
+                                           command=self._schedule_preview)
+        self._size_check.pack(anchor="w", pady=(8, 0))
+        if initial["-SIZECHECKBOX-"]:
+            self._size_check.select()
+
+        layout = _section(parent, "Layout")
+        row = ctk.CTkFrame(layout, fg_color="transparent")
+        row.pack(fill="x")
+        self._register_entry("-ROWS-", initial["-ROWS-"], row).pack(side="left")
+        ctk.CTkLabel(row, text="×").pack(side="left", padx=6)
+        self._register_entry("-COLUMNS-", initial["-COLUMNS-"], row).pack(side="left")
+        ctk.CTkLabel(row, text="rows × columns").pack(side="left", padx=6)
+        self._labeled_number(layout, "Space between", "-GAP-", initial["-GAP-"])
+        self._labeled_number(layout, "Horizontal safe zones", "-HSZONES-",
+                             initial["-HSZONES-"])
+        self._labeled_number(layout, "Vertical safe zones", "-VSZONES-",
+                             initial["-VSZONES-"])
+        self._double_check = ctk.CTkCheckBox(layout, text="Double sided cards",
+                                             command=self._schedule_preview)
+        self._double_check.pack(anchor="w", pady=(8, 0))
+        if initial["-DOUBLECHECKBOX-"]:
+            self._double_check.select()
+
+        files = _section(parent, "Files")
+        self._folder_row(files, "-CFOLDER-", initial["-CFOLDER-"])
+        self._folder_row(files, "-PDFFOLDER-", initial["-PDFFOLDER-"])
+
+    def _labeled_number(self, parent, label, key, value):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=(8, 0))
+        ctk.CTkLabel(row, text=label).pack(side="left")
+        self._register_entry(key, value, row).pack(side="left", padx=6)
+        ctk.CTkLabel(row, text="mm").pack(side="left")
+
+    def _folder_row(self, parent, key, value):
+        row = ctk.CTkFrame(parent, fg_color="transparent")
+        row.pack(fill="x", pady=(0, 8))
+        entry = self._register_entry(key, value, row, width=30)
+        entry.pack(side="left", fill="x", expand=True)
+        ctk.CTkButton(row, text="Choose…", width=90,
+                      command=lambda: self._choose_folder(key)).pack(
+            side="left", padx=(6, 0))
+
+    def _build_bottom(self, parent):
+        parent.grid_columnconfigure(0, weight=1)
+        bar = ctk.CTkFrame(parent, corner_radius=12)
+        bar.grid(row=0, column=0, sticky="ew")
+        bar.grid_columnconfigure(0, weight=1)
+
+        self._progress = ctk.CTkProgressBar(bar, height=8)
+        self._progress.set(0)
+        self._progress.grid(row=0, column=0, columnspan=4, sticky="ew",
+                            padx=12, pady=(12, 4))
+
+        self._status = ctk.CTkLabel(bar, text="", anchor="w", text_color=_GREY)
+        self._status.grid(row=1, column=0, sticky="w", padx=12, pady=(0, 12))
+
+        self._run_button = ctk.CTkButton(
+            bar, text="Create PDF", width=140, command=self._run,
+            fg_color=("#3a7ebf", "#1f538d"))
+        self._run_button.grid(row=1, column=1, padx=6, pady=(0, 12))
+        self._cancel_button = ctk.CTkButton(
+            bar, text="Cancel", width=90, state="disabled",
+            command=self._cancel)
+        self._cancel_button.grid(row=1, column=2, padx=6, pady=(0, 12))
+
+        links = ctk.CTkFrame(bar, fg_color="transparent")
+        links.grid(row=1, column=3, sticky="e", padx=12, pady=(0, 12))
+        self._link(links, "Contact", CONTACT_URL)
+        self._link(links, "Double-sided guide", GUIDE_URL)
+        ctk.CTkLabel(links, text=f"v{PROGRAM_VERSION}").pack(
+            side="left", padx=(8, 0))
+
+    def _link(self, parent, text, url):
+        label = ctk.CTkLabel(parent, text=text, text_color=("#1f6feb", "#4c9aff"))
+        label.pack(side="left", padx=4)
+        label.bind("<Button-1>", lambda event, u=url: webbrowser.open(u))
+
+    def _build_preview(self, parent):
+        parent.grid_columnconfigure(0, weight=1)
+        parent.grid_rowconfigure(1, weight=1)
+
+        header = ctk.CTkFrame(parent, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=14, pady=(12, 4))
+        header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(header, text="Preview",
+                     font=ctk.CTkFont(size=13, weight="bold")).grid(
+            row=0, column=0, sticky="w")
+        self._prev_button = ctk.CTkButton(header, text="‹", width=32,
+                                          command=lambda: self._step_page(-1))
+        self._prev_button.grid(row=0, column=1, padx=2)
+        self._page_label = ctk.CTkLabel(header, text="1 / 1", width=48)
+        self._page_label.grid(row=0, column=2)
+        self._next_button = ctk.CTkButton(header, text="›", width=32,
+                                          command=lambda: self._step_page(1))
+        self._next_button.grid(row=0, column=3, padx=2)
+
+        self._picture = ctk.CTkLabel(parent, text="")
+        self._picture.grid(row=1, column=0, padx=14, pady=6)
+
+        self._summary = ctk.CTkLabel(parent, text="", text_color=_GREY)
+        self._summary.grid(row=2, column=0, padx=14, pady=(4, 8))
+
+        self._thumbs = ctk.CTkFrame(parent, fg_color="transparent")
+        self._thumbs.grid(row=3, column=0, padx=14, pady=(0, 8), sticky="ew")
+
+        self._preview_status = ctk.CTkLabel(parent, text="", anchor="w",
+                                            text_color=_GREY)
+        self._preview_status.grid(row=4, column=0, sticky="ew", padx=14,
+                                  pady=(0, 12))
+
+        self._set_nav(1)
+
+    # -- widget values ---------------------------------------------------
+
+    def values(self):
+        """The window contract dict, with checkboxes normalised to bool."""
+        raw = {key: self._entries[key].get() for key in _ENTRY_KEYS}
+        raw["-SIZECHECKBOX-"] = bool(self._size_check.get())
+        raw["-DOUBLECHECKBOX-"] = bool(self._double_check.get())
+        return form.check_values(raw)
+
+    def _apply_preset(self, label):
+        preset = PAPER_PRESETS.get(label)
+        if preset is None:
+            return
+        for key, value in zip(("-PWIDTH-", "-PHEIGHT-"), preset):
+            entry = self._entries[key]
+            entry.delete(0, "end")
+            entry.insert(0, str(value))
+        self._schedule_preview()
+
+    def _choose_folder(self, key):
+        from tkinter import filedialog
+
+        current = self._entries[key].get()
+        chosen = filedialog.askdirectory(initialdir=current or None)
+        if chosen:
+            entry = self._entries[key]
+            entry.delete(0, "end")
+            entry.insert(0, chosen)
+            self._schedule_preview()
+
+    # -- preview ---------------------------------------------------------
+
+    def _schedule_preview(self):
+        if self._closed:
+            return
+        if self._job is not None and self._job.is_running():
+            self._preview_pending = True
+            return
+        if not self._entries["-CFOLDER-"].get().strip():
+            self._clear_preview()
+            self._preview_status.configure(
+                text="Choose a cards folder to see the preview.",
+                text_color=_GREY)
+            return
+        self._preview_status.configure(text="Rendering…", text_color=_GREY)
+        self._preview.submit(self.values())
+
+    def _tick(self):
+        self._drain_build()
+        self._drain_preview()
+        if self._preview_pending and not (
+                self._job is not None and self._job.is_running()):
+            self._preview_pending = False
+            self._schedule_preview()
+        if self._preview.due():
+            self._preview.start()
+        if not self._closed:
+            self.after(100, self._tick)
+
+    def _drain_preview(self):
+        result = self._preview.take()
+        if result is None:
+            return
+        if result.error:
+            self._clear_preview()
+            self._preview_status.configure(text=result.error, text_color=_ERROR)
+            return
+        self._show_pages(result.images, result.summary)
+
+    def _clear_preview(self):
+        for button in self._thumb_buttons:
+            button.destroy()
+        self._thumb_buttons = []
+        self._page_views = []
+        self._page_thumbs = []
+        self._summary.configure(text="")
+        self._show_page(0)
+
+    def _show_pages(self, images, summary):
+        self._preview_status.configure(text="", text_color=_GREY)
+        self._summary.configure(text=summary)
+        for button in self._thumb_buttons:
+            button.destroy()
+        self._thumb_buttons = []
+        self._page_views = []
+        self._page_thumbs = []
+        for index, image in enumerate(images or []):
+            self._page_views.append(self._ctk_image(
+                image, _PREVIEW_PICTURE_WIDTH, _PREVIEW_PICTURE_HEIGHT))
+            thumb = self._ctk_image(image, _THUMB_WIDTH, _THUMB_HEIGHT)
+            self._page_thumbs.append(thumb)
+            button = ctk.CTkButton(self._thumbs, text="", image=thumb,
+                                   width=_THUMB_WIDTH, height=_THUMB_HEIGHT,
+                                   command=lambda i=index: self._show_page(i))
+            button.pack(side="left", padx=3)
+            self._thumb_buttons.append(button)
+        self._page_index = 0
+        self._show_page(0)
+
+    def _ctk_image(self, image, max_width, max_height):
+        return ctk.CTkImage(light_image=image, dark_image=image,
+                            size=_fit_size(image, max_width, max_height))
+
+    def _show_page(self, index):
+        if not self._page_views:
+            self._picture.configure(image=None, text="")
+            self._page_label.configure(text="1 / 1")
+            self._set_nav(1)
+            return
+        index = max(0, min(index, len(self._page_views) - 1))
+        self._page_index = index
+        self._picture.configure(image=self._page_views[index], text="")
+        self._page_label.configure(text=f"{index + 1} / {len(self._page_views)}")
+        self._set_nav(len(self._page_views))
+
+    def _step_page(self, delta):
+        self._show_page(self._page_index + delta)
+
+    def _set_nav(self, count):
+        state = "disabled" if count <= 1 else "normal"
+        self._prev_button.configure(state=state)
+        self._next_button.configure(state=state)
+
+    # -- build job -------------------------------------------------------
+
+    def _run(self):
+        if self._job is not None and self._job.is_running():
+            return
+        try:
+            options = JobOptions.from_form(self.values())
+            options.validate()
+        except InputError as error:
+            self._show_error(str(error))
+            return
+
+        self._run_button.configure(state="disabled")
+        self._cancel_button.configure(state="normal")
+        self._status.configure(text="")
+        self._progress.set(0)
+
+        self._job = BuildJob(
+            options, lambda name, payload: self._build_events.put((name, payload)))
+        self._job.start()
+
+    def _drain_build(self):
+        while True:
+            try:
+                name, payload = self._build_events.get_nowait()
+            except queue.Empty:
+                break
+            if name == "progress":
+                done, total, text = payload
+                self._progress.set(done / total if total else 0)
+                self._status.configure(text=text)
+            elif name == "done":
+                self.result = self.values()
+                self._close()
+            elif name == "error":
+                self._finish_run()
+                self._status.configure(text="Failed")
+                self._show_error(payload)
+            elif name == "cancelled":
+                self._finish_run()
+                self._status.configure(text="Cancelled")
+
+    def _finish_run(self):
+        self._run_button.configure(state="normal")
+        self._cancel_button.configure(state="disabled")
+        self._progress.set(0)
+
+    def _cancel(self):
+        if self._job is not None:
+            self._job.cancel()
+        self._cancel_button.configure(state="disabled")
+        self._status.configure(text="Cancelling…")
+
+    def _show_error(self, message):
+        from tkinter import messagebox
+
+        messagebox.showerror("PnP2PDF", message)
+
+    # -- life cycle ------------------------------------------------------
+
+    def _close(self):
+        self._closed = True
+        self._preview.stop()
+        self.destroy()
+
+    def _on_close(self):
+        self._closed = True
+        self._preview.stop()
+        if self._job is not None and self._job.is_running():
+            self._job.cancel()
+            self._job.join(5)
+        self.result = "Window closed"
+        self.destroy()
 
 
 def ui_window(settings: dict):
-    form_rows = [
-                 [sg.Text('Paper size', size=(14, 1)), 
-                  sg.InputText(settings["paper_width"], size=(6, 1), key="-PWIDTH-"), sg.Text('x'), 
-                  sg.InputText(settings["paper_height"], size=(6, 1), key="-PHEIGHT-"), sg.Text('mm'), 
-                  sg.Push(), 
-                  sg.Text('Contact me', enable_events = True, 
-                          font = ('Courier New', 12, 'underline'), 
-                          key='URL https://www.t.me/nNekoChan')],
-
-                 [sg.Text('Card size', size=(14, 1)), 
-                  sg.InputText(f"{settings['card_width']}", size=(6, 1), key="-CWIDTH-"), sg.Text('x'), 
-                  sg.InputText(f"{settings['card_height']}", size=(6, 1), key="-CHEIGHT-"), sg.Text('mm'), 
-                  sg.Push(),
-                  sg.Checkbox("Smaller size (98%)", default=settings["resize"], key='-SIZECHECKBOX-')],
-
-                 [sg.Text("Pattern", size=(14, 1)),
-                  sg.InputText(f"{settings['rows']}", size=(6, 1), key="-ROWS-"), sg.Text('x'), 
-                  sg.InputText(f"{settings['columns']}", size=(6, 1), key="-COLUMNS-"), 
-                  sg.Text('(Raws x Columns)'),
-                  sg.Push(),
-                  sg.Checkbox("Double Sided Cards", default=settings["double_sided"], key='-DOUBLECHECKBOX-')],
-
-                 [sg.Text('Space between', size=(14, 1)), 
-                  sg.InputText(f"{settings['gap']}", size=(6, 1), key="-GAP-"), sg.Text('mm'),
-                  sg.Push(),
-                  sg.Text('Prepare files for double sided print', enable_events = True, 
-                          font = ('Courier New', 10, 'underline'), 
-                          key='URL https://github.com/Dannoster/PnP2PDF/tree/main#how-to-prepare-double-sided-cards')],
-
-                 [sg.Text("Hor. safe zones", size=(14, 1)),
-                  sg.InputText(f"{settings['ud_szone']}", size=(6, 1), key="-HSZONES-"), sg.Text('mm\t'),
-                  sg.Text("Vert. safe zones", size=(14, 1)),
-                  sg.InputText(f"{settings['lr_szone']}", size=(6, 1), key="-VSZONES-"), sg.Text('mm')], 
-
-                 [sg.Text('Cards folder', size=(14, 1)), 
-                  sg.InputText(f"{settings['cards_folder']}", key='-CFOLDER-'), 
-                  sg.FolderBrowse(initial_folder=settings['cards_folder'])],
-
-                 [sg.Text('Save PDF to', size=(14, 1)), 
-                  sg.InputText(f"{settings['save_to']}", key='-PDFFOLDER-'), 
-                  sg.FolderBrowse(initial_folder=settings['save_to'])],
-
-                 [sg.ProgressBar(1000, orientation="h", size=(20, 20), key="-PROGRESS-")],
-                 [sg.Text("", size=(40, 1), key="-STATUS-")],
-                 [sg.Button("Create PDF", key="-RUN-", size=(14, 1)),
-                  sg.Button("Cancel", key="-CANCEL-", disabled=True),
-                  sg.Push(), sg.Text(f"v{PROGRAM_VERSION}")]
-                ]
-
-    window = sg.Window('PnP2PDF', form_rows, icon=resource_path("icon.png"))
-
-    job = None
-    job_values = {}
-
-    while True:
-        event, values = window.read(timeout=100)
-        if event is None:
-            continue
-        if event == sg.WINDOW_CLOSED:
-            if job is not None and job.is_running():
-                job.cancel()
-                job.join(timeout=5)
-            return "Window closed"
-        elif event.startswith("URL "):
-            url = event.split(' ')[1]
-            webbrowser.open(url)
-        elif event == "-RUN-":
-            if job is not None and job.is_running():
-                continue
-            window["-RUN-"].update(disabled=True)
-            window["-CANCEL-"].update(disabled=False)
-            window["-STATUS-"].update("")
-            window["-PROGRESS-"].update(0)
-            job_values = dict(values)
-
-            def post(name, payload):
-                key = {"progress": "-PROGRESS-", "done": "-DONE-",
-                       "error": "-ERROR-", "cancelled": "-CANCELLED-"}[name]
-                window.write_event_value(key, payload)
-
-            try:
-                options = JobOptions.from_form(job_values)
-            except Exception as error:
-                sg.popup_error(f"Could not create the PDF:\n\n{error}")
-                window["-RUN-"].update(disabled=False)
-                window["-CANCEL-"].update(disabled=True)
-                window["-STATUS-"].update("Failed")
-                continue
-
-            job = BuildJob(options, post)
-            job.start()
-        elif event == "-PROGRESS-":
-            done, total, text = values["-PROGRESS-"]
-            window["-PROGRESS-"].update(done * 1000 // max(total, 1))
-            window["-STATUS-"].update(text)
-        elif event == "-DONE-":
-            window.close()
-            return job_values
-        elif event == "-ERROR-":
-            sg.popup_error(f"Could not create the PDF:\n\n{values['-ERROR-']}")
-            window["-RUN-"].update(disabled=False)
-            window["-CANCEL-"].update(disabled=True)
-            window["-STATUS-"].update("Failed")
-        elif event == "-CANCELLED-":
-            window["-RUN-"].update(disabled=False)
-            window["-CANCEL-"].update(disabled=True)
-            window["-PROGRESS-"].update(0)
-            window["-STATUS-"].update("Cancelled")
-        elif event == "-CANCEL-":
-            if job is not None:
-                job.cancel()
-            window["-CANCEL-"].update(disabled=True)
-            window["-STATUS-"].update("Cancelling…")
+    ctk.set_appearance_mode("system")
+    window = PnP2PDFWindow(settings)
+    window.mainloop()
+    return window.result
 
 
 def main():
@@ -139,7 +488,7 @@ def main():
                     "rows"          : ui_output['-ROWS-'],
                     "columns"       : ui_output['-COLUMNS-'],
                     "gap"           : ui_output['-GAP-'],
-                    "ud_szone"      : ui_output['-HSZONES-'], 
+                    "ud_szone"      : ui_output['-HSZONES-'],
                     "lr_szone"      : ui_output['-VSZONES-'],
                     "cards_folder"  : ui_output['-CFOLDER-'],
                     "save_to"       : ui_output['-PDFFOLDER-']}

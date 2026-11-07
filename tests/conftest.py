@@ -9,15 +9,25 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-class _GuiStub(types.ModuleType):
-    """Stands in for PySimpleGUI so tests never need the real library."""
+class _StubWidget:
+    """A dummy widget: subclassable and callable, ignoring every argument."""
+
+    def __init__(self, *args, **kwargs):
+        pass
 
     def __getattr__(self, name):
         return lambda *args, **kwargs: None
 
 
-if "PySimpleGUI" not in sys.modules:
-    sys.modules["PySimpleGUI"] = _GuiStub("PySimpleGUI")
+class _GuiStub(types.ModuleType):
+    """Stands in for customtkinter so tests never need the real library."""
+
+    def __getattr__(self, name):
+        return _StubWidget
+
+
+if "customtkinter" not in sys.modules:
+    sys.modules["customtkinter"] = _GuiStub("customtkinter")
 
 
 @pytest.fixture(scope="session")

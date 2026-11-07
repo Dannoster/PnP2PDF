@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.1.0] - 2026-11-07
+
+### Added
+- the window is now built with CustomTkinter and shows a live preview panel of the sheets being assembled
+- the app bundle now carries a real version number instead of `0.0.0`
+
+### Changed
+- the window no longer depends on PySimpleGUI; `customtkinter` replaces it
+
 ## [3.0.0] - 2026-11-07
 
 ### Added
@@ -37,4 +46,5 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Removed
 - the disk round-trip through temporary `_page_*.jpeg` files
 
+[3.1.0]: https://github.com/Dannoster/PnP2PDF/releases/tag/v3.1.0
 [3.0.0]: https://github.com/Dannoster/PnP2PDF/releases/tag/v3.0.0

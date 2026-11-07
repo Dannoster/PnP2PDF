@@ -1,2 +1,2 @@
 Pillow>=13.0
-PySimpleGUI>=6.4
+customtkinter>=6.0

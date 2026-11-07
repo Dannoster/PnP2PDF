@@ -60,6 +60,11 @@ Exit codes: `0` success, `1` unexpected error, `2` bad input, `130` cancelled.
 
 ## Program interface
 
+The window is built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter).
+Settings are grouped into cards on the left, and a live preview panel on the
+right shows the sheets as they will be assembled, with page thumbnails and a
+short summary, so the result can be checked before pressing `Create PDF`.
+
 <img width="584" alt="image" src="https://github.com/Dannoster/PnP2PDF/assets/91663466/76cb986b-e322-4fae-ba88-3925bf03d61b">
 
 ## Result
@@ -90,7 +95,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-The suite stubs PySimpleGUI, so no display and no GUI licence are needed.
+The suite stubs customtkinter, so no display is needed.
 Settings are stored as `presets.json` in `~/Library/Application Support/PnP2PDF`
 on macOS and `%APPDATA%\PnP2PDF` on Windows when running the packaged app; on
 Linux they go to `$XDG_DATA_HOME/pnp2pdf` (or `~/.local/share/pnp2pdf`). Running

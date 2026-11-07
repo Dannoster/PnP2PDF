@@ -53,7 +53,7 @@ Additional conventions:
 This is a desktop GUI program, so most changes need a manual check:
 
 ```bash
-pip install -r requirements.txt   # or install PySimpleGUI and pillow
+pip install -r requirements.txt   # or install customtkinter and pillow
 python PnP2PDF.py
 ```
 
@@ -74,4 +74,4 @@ python -m pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-The suite stubs PySimpleGUI, so no display and no GUI licence are needed.
+The suite stubs customtkinter, so no display is needed.

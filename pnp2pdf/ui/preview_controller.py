@@ -2,7 +2,7 @@
 
 The window feeds widget values in with :meth:`PreviewController.submit` and
 polls for finished pictures with :meth:`PreviewController.take`. Everything
-here is plain Python: no ``customtkinter``, no ``tkinter``, no PySimpleGUI.
+here is plain Python: no ``customtkinter``, no ``tkinter``.
 """
 
 import queue
