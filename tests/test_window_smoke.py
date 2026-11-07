@@ -241,3 +241,62 @@ def test_create_pdf_stays_enabled_after_a_failed_preview(gui, tmp_path):
         assert window._run_button.state == "normal"
     finally:
         window.destroy()
+
+
+def test_the_output_folder_is_hidden_by_default(gui, card_folder):
+    module, _ = gui
+    folder = _cards(card_folder)
+    window = _window(module, folder)
+    try:
+        assert window._output_row.packed is False
+        assert window._output_hint.packed is True
+        assert window._output_switch.get() is False
+    finally:
+        window.destroy()
+
+
+def test_toggling_the_output_switch_shows_and_hides_the_row(gui, card_folder):
+    module, _ = gui
+    folder = _cards(card_folder)
+    window = _window(module, folder)
+    try:
+        window._output_switch.select()
+        window._toggle_output_folder()
+
+        assert window._output_row.packed is True
+        assert window._output_hint.packed is False
+
+        window._output_switch.deselect()
+        window._toggle_output_folder()
+
+        assert window._output_row.packed is False
+        assert window._output_hint.packed is True
+    finally:
+        window.destroy()
+
+
+def test_an_existing_output_folder_shows_the_row_ticked(gui, card_folder, tmp_path):
+    module, _ = gui
+    folder = _cards(card_folder)
+    window = _window(module, folder, save_to=str(tmp_path))
+    try:
+        assert window._output_row.packed is True
+        assert window._output_hint.packed is False
+        assert window._output_switch.get() is True
+    finally:
+        window.destroy()
+
+
+def test_files_section_names_both_folders(gui, card_folder):
+    module, _ = gui
+    folder = _cards(card_folder)
+    window = _window(module, folder)
+    try:
+        assert fake_ctk.find_by_text(window, "Cards folder") is not None
+        assert fake_ctk.find_by_text(window, "Save the PDF to") is not None
+        assert window._entries["-CFOLDER-"].cget(
+            "placeholder_text") == "Where the card images are"
+        assert window._entries["-PDFFOLDER-"].cget(
+            "placeholder_text") == "Folder for the PDF"
+    finally:
+        window.destroy()

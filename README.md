@@ -67,7 +67,9 @@ Exit codes: `0` success, `1` unexpected error, `2` bad input, `130` cancelled.
 The window is built with [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter).
 Settings are grouped into cards on the left, and a live preview panel on the
 right shows the sheets as they will be assembled, with page thumbnails and a
-short summary, so the result can be checked before pressing `Create PDF`.
+short summary, so the result can be checked before pressing `Create PDF`. The
+output folder is optional: leave it empty and the PDF is saved next to the
+cards.
 
 <img width="584" alt="image" src="https://github.com/Dannoster/PnP2PDF/assets/91663466/76cb986b-e322-4fae-ba88-3925bf03d61b">
 

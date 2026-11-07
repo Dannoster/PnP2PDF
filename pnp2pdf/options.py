@@ -20,6 +20,7 @@ def _integer(value, label: str) -> int:
 @dataclass(frozen=True)
 class JobOptions:
     cards_folder: str
+    # May be empty, in which case the PDF goes next to the cards.
     output_folder: str
     paper_width: float = 210
     paper_height: float = 297
@@ -51,11 +52,15 @@ class JobOptions:
             double_sided=values['-DOUBLECHECKBOX-'],
         )
 
+    @property
+    def resolved_output_folder(self) -> str:
+        """The folder the PDF goes to; defaults to the cards folder."""
+        return (self.output_folder or "").strip() or self.cards_folder.strip()
+
     def validate(self) -> None:
+        """Check the options; the output folder may be empty."""
         if not self.cards_folder or not self.cards_folder.strip():
             raise InputError("Cards folder must not be empty.")
-        if not self.output_folder or not self.output_folder.strip():
-            raise InputError("Output folder must not be empty.")
         if self.paper_width <= 0 or self.paper_height <= 0:
             raise InputError(
                 f"Paper size must be positive (got {self.paper_width} x "

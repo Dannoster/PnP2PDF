@@ -56,6 +56,22 @@ def test_validate_rejects_bad_values(pnp):
         pnp.JobOptions(cards_folder='cards', output_folder='out', gap=-1).validate()
 
 
+def test_validate_allows_an_empty_output_folder(pnp):
+    pnp.JobOptions(cards_folder='cards', output_folder='').validate()
+
+
+def test_resolved_output_folder_falls_back_to_the_cards_folder(pnp):
+    options = pnp.JobOptions(cards_folder='cards', output_folder='')
+
+    assert options.resolved_output_folder == 'cards'
+
+
+def test_resolved_output_folder_keeps_a_filled_folder_stripped(pnp):
+    options = pnp.JobOptions(cards_folder='cards', output_folder='  out  ')
+
+    assert options.resolved_output_folder == 'out'
+
+
 def test_create_pdf_writes_pdf(pnp, card_folder, tmp_path):
     folder = card_folder(names=['1.png', '2.png'])
     options = pnp.JobOptions(cards_folder=str(folder),

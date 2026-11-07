@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - the window no longer depends on PySimpleGUI; `customtkinter` replaces it
+- the Files section now names both folders and the output folder is optional (empty means next to the cards)
 
 ### Fixed
 - the macOS bundle is re-signed after its version is written, so it no longer reports "is damaged" on launch

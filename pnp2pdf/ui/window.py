@@ -45,6 +45,11 @@ _THUMB_HEIGHT = 88
 _GREY = ("gray40", "gray70")
 _ERROR = ("#b23a2e", "#e06c5a")
 
+_FOLDER_CAPTIONS = {
+    "-CFOLDER-": "Cards folder",
+    "-PDFFOLDER-": "Save the PDF to",
+}
+
 
 def _section(parent, title):
     """A rounded card holding a bold header; returns the frame for the body."""
@@ -58,10 +63,11 @@ def _section(parent, title):
     return body
 
 
-def _entry(parent, key, value, width=6):
+def _entry(parent, key, value, width=6, placeholder=""):
     """A fixed-width text entry pre-filled with ``value``."""
     entry = ctk.CTkEntry(parent, width=max(60, width * 12),
-                         font=ctk.CTkFont(size=12))
+                         font=ctk.CTkFont(size=12),
+                         placeholder_text=placeholder)
     entry.insert(0, str(value))
     return entry
 
@@ -101,6 +107,9 @@ class PnP2PDFWindow(ctk.CTk):
         self._page_index = 0
 
         self._build_ui(settings)
+        if self._entries["-PDFFOLDER-"].get().strip():
+            self._output_switch.select()
+            self._toggle_output_folder()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(100, self._tick)
         self._schedule_preview()
@@ -127,8 +136,8 @@ class PnP2PDFWindow(ctk.CTk):
                     padx=12, pady=(0, 12))
         self._build_bottom(bottom)
 
-    def _register_entry(self, key, value, parent, width=6):
-        entry = _entry(parent, key, value, width)
+    def _register_entry(self, key, value, parent, width=6, placeholder=""):
+        entry = _entry(parent, key, value, width, placeholder)
         entry.bind("<KeyRelease>", lambda event: self._schedule_preview())
         self._entries[key] = entry
         return entry
@@ -180,8 +189,22 @@ class PnP2PDFWindow(ctk.CTk):
             self._double_check.select()
 
         files = _section(parent, "Files")
-        self._folder_row(files, "-CFOLDER-", initial["-CFOLDER-"])
-        self._folder_row(files, "-PDFFOLDER-", initial["-PDFFOLDER-"])
+        self._folder_row(files, "-CFOLDER-", initial["-CFOLDER-"],
+                         placeholder="Where the card images are")
+
+        self._output_switch = ctk.CTkCheckBox(
+            files, text="Save the PDF to a different folder",
+            command=self._toggle_output_folder)
+        self._output_switch.pack(anchor="w", pady=(8, 0))
+
+        self._output_hint = ctk.CTkLabel(
+            files, text="The PDF will be saved next to the cards.",
+            anchor="w", text_color=_GREY)
+        self._output_hint.pack(fill="x")
+
+        self._output_row = self._folder_row(
+            files, "-PDFFOLDER-", initial["-PDFFOLDER-"],
+            placeholder="Folder for the PDF", pack=False)
 
     def _labeled_number(self, parent, label, key, value):
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -190,14 +213,28 @@ class PnP2PDFWindow(ctk.CTk):
         self._register_entry(key, value, row).pack(side="left", padx=6)
         ctk.CTkLabel(row, text="mm").pack(side="left")
 
-    def _folder_row(self, parent, key, value):
+    def _folder_row(self, parent, key, value, placeholder="", pack=True):
         row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", pady=(0, 8))
-        entry = self._register_entry(key, value, row, width=30)
+        ctk.CTkLabel(row, text=_FOLDER_CAPTIONS[key], anchor="w").pack(fill="x")
+        line = ctk.CTkFrame(row, fg_color="transparent")
+        line.pack(fill="x")
+        entry = self._register_entry(key, value, line, width=30,
+                                     placeholder=placeholder)
         entry.pack(side="left", fill="x", expand=True)
-        ctk.CTkButton(row, text="Choose…", width=90,
+        ctk.CTkButton(line, text="Choose…", width=90,
                       command=lambda: self._choose_folder(key)).pack(
             side="left", padx=(6, 0))
+        if pack:
+            row.pack(fill="x", pady=(0, 8))
+        return row
+
+    def _toggle_output_folder(self):
+        if self._output_switch.get():
+            self._output_hint.pack_forget()
+            self._output_row.pack(fill="x", pady=(0, 8))
+        else:
+            self._output_row.pack_forget()
+            self._output_hint.pack(fill="x")
 
     def _build_bottom(self, parent):
         parent.grid_columnconfigure(0, weight=1)

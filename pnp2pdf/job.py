@@ -20,5 +20,5 @@ def create_pdf(options: JobOptions, progress=None, cancelled=None) -> str:
                            options.ud_szone,
                            options.lr_szone)
     pdf = PdfFile(sheets)
-    return pdf.save(options.output_folder, options.double_sided,
+    return pdf.save(options.resolved_output_folder, options.double_sided,
                     progress=progress, cancelled=cancelled)

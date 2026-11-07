@@ -33,6 +33,7 @@ class _Widget:
         self.command = kwargs.get("command", None)
         self.bindings = {}
         self.destroyed = False
+        self.packed = False
         if isinstance(master, _Widget):
             master.children.append(self)
 
@@ -40,7 +41,12 @@ class _Widget:
 
     def pack(self, **kwargs):
         self.options["_pack"] = kwargs
+        self.packed = True
         return self
+
+    def pack_forget(self):
+        self.options.pop("_pack", None)
+        self.packed = False
 
     def grid(self, **kwargs):
         self.options["_grid"] = kwargs
@@ -163,12 +169,16 @@ class CTkScrollableFrame(CTkFrame):
 
 
 class CTkLabel(_Widget):
-    pass
+    def __init__(self, master=None, **kwargs):
+        super().__init__(master, **kwargs)
+        self.anchor = kwargs.get("anchor", None)
+        self.text_color = kwargs.get("text_color", None)
 
 
 class CTkEntry(_Widget):
     def __init__(self, master=None, **kwargs):
         super().__init__(master, **kwargs)
+        self.placeholder_text = kwargs.get("placeholder_text", "")
         self._buffer = ""
 
     def insert(self, index, text):
