@@ -3,8 +3,7 @@ build/
 *.spec
 .venv/
 /presets.json
-/.DS_Store
-color_profiles/.DS_Store
+.DS_Store
 __pycache__/
 .pytest_cache/
 *.pyc

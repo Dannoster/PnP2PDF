@@ -41,7 +41,9 @@ python3 -m pnp2pdf.cli --cards examples/two-backs     --out /tmp/ex --double-sid
 python3 -m pnp2pdf.cli --cards examples/double-sided  --out /tmp/ex --double-sided --quiet
 ```
 
-With `--double-sided` every sheet is followed by a mirrored back page.
+With `--double-sided` every sheet is followed by a mirrored back page. In the
+window the same thing is the **Double sided cards** checkbox — without it, back
+images are printed as ordinary cards.
 
 - `single-sided`: 9 cards fit one 3×3 A4 sheet → 1 page.
 - `one-back`: 6 cards, one mirrored back page → 2 pages.
