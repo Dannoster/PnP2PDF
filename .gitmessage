@@ -1,0 +1,15 @@
+# <type>(<scope>): imperative summary, max 72 chars
+#
+# Why: what was broken or missing, and why this approach.
+#      Not a restatement of the diff.
+#
+# Tested: exactly what you ran and what you observed.
+#         If something was not tested, say so.
+#
+# Trailers (leave one blank line above them):
+#   Assisted-by: <tool> (<model>)
+#   Closes #<issue>
+#
+# Types: feat fix refactor docs test ci chore perf
+#
+# Lines starting with '#' are ignored.
