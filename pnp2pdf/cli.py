@@ -4,9 +4,12 @@ import argparse
 import sys
 
 from pnp2pdf import __version__
+from pnp2pdf.cards import create_cards
 from pnp2pdf.errors import InputError, OperationCancelled
 from pnp2pdf.job import create_pdf
+from pnp2pdf.layout import create_sheets
 from pnp2pdf.options import JobOptions
+from pnp2pdf.preview import preview_pages
 
 _SEPARATORS = ("×", "X", "x")
 
@@ -67,7 +70,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--cards", required=True, metavar="DIR",
                         help="folder containing the card images")
-    parser.add_argument("--out", required=True, metavar="DIR",
+    parser.add_argument("--out", metavar="DIR",
                         help="folder where the PDF is written")
     parser.add_argument("--paper", metavar="WxH",
                         type=lambda text: _parse_size(
@@ -102,6 +105,8 @@ def _build_parser() -> argparse.ArgumentParser:
                         help="also print the backs of double-sided cards")
     parser.add_argument("--quiet", action="store_true",
                         help="suppress the progress report")
+    parser.add_argument("--preview", metavar="PATH",
+                        help="write the first preview page as a PNG and exit")
     parser.add_argument("--version", action="version",
                         version=f"pnp2pdf {__version__}")
     return parser
@@ -137,9 +142,14 @@ def main(argv=None) -> int:
     except SystemExit as exit_code:
         return exit_code.code if isinstance(exit_code.code, int) else 0
 
+    if args.preview is None and not args.out:
+        print("error: the following arguments are required: --out",
+              file=sys.stderr)
+        return 2
+
     options = JobOptions(
         cards_folder=args.cards,
-        output_folder=args.out,
+        output_folder=args.out or "",
         paper_width=args.paper[0],
         paper_height=args.paper[1],
         card_width=args.card[0],
@@ -155,6 +165,18 @@ def main(argv=None) -> int:
 
     progress = _Progress(args.quiet)
     try:
+        if args.preview is not None:
+            cards = create_cards(options.cards_folder, options.card_width,
+                                 options.card_height, options.smaller_size,
+                                 options.double_sided)
+            sheets = create_sheets(cards, options.paper_width,
+                                   options.paper_height, options.rows,
+                                   options.columns, options.gap,
+                                   options.ud_szone, options.lr_szone)
+            images = preview_pages(sheets, limit=1)
+            if images:
+                images[0].save(args.preview, "PNG")
+            return 0
         create_pdf(options, progress=progress, cancelled=lambda: False)
     except InputError as error:
         progress.finish()
