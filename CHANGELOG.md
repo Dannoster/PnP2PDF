@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 - the window no longer depends on PySimpleGUI; `customtkinter` replaces it
 
+### Fixed
+- the macOS bundle is re-signed after its version is written, so it no longer reports "is damaged" on launch
+
 ## [3.0.0] - 2026-11-07
 
 ### Added

@@ -71,7 +71,16 @@ if [ "$(uname -s)" = "Darwin" ]; then
         dist/PnP2PDF.app/Contents/Info.plist
     plutil -replace CFBundleVersion -string "$VERSION" \
         dist/PnP2PDF.app/Contents/Info.plist
+    echo "==> Re-signing the bundle ad hoc"
+    codesign --force --sign - "dist/PnP2PDF.app"
+    if ! codesign --verify --deep --strict "dist/PnP2PDF.app"; then
+        echo "codesign could not re-sign the bundle" >&2
+        exit 1
+    fi
     echo "==> Built dist/PnP2PDF.app ($VERSION)"
+    echo "    The app is ad-hoc signed. A browser-downloaded copy needs"
+    echo "    xattr -dr com.apple.quarantine /Applications/PnP2PDF.app"
+    echo "    before the first launch."
     echo "    Launch it with: open dist/PnP2PDF.app"
 else
     echo "==> Built dist/PnP2PDF/PnP2PDF"

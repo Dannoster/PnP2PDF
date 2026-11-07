@@ -38,6 +38,10 @@ jobs:
         shell: bash
         run: ./build_app.sh
 
+      - name: Verify the bundle signature
+        if: matrix.os == 'macos-latest'
+        run: codesign --verify --deep --strict dist/PnP2PDF.app
+
       - name: Package (macOS)
         if: runner.os == 'macOS'
         shell: bash
