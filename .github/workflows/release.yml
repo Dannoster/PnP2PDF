@@ -52,16 +52,60 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path dist\PnP2PDF\* -DestinationPath "${{ matrix.artifact }}"
 
+      - name: Build the release notes
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ.get("GITHUB_REF_NAME", "").strip()
+          if version.startswith("v"):
+              version = version[1:]
+          if not version:
+              pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+              match = re.search(r'(?m)^version\s*=\s*"([^"]+)"', pyproject)
+              version = match.group(1) if match else ""
+
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          collecting = False
+          lines = []
+          for line in changelog.splitlines():
+              if line.startswith("## "):
+                  if collecting:
+                      break
+                  if line.startswith("## [%s]" % version):
+                      collecting = True
+                  continue
+              if collecting:
+                  if re.match(r"^\[[^\]]+\]:", line):
+                      break
+                  lines.append(line)
+          while lines and not lines[0].strip():
+              lines.pop(0)
+          while lines and not lines[-1].strip():
+              lines.pop()
+          block = "\n".join(lines)
+
+          if not block:
+              block = "See CHANGELOG.md in the repository."
+
+          header = (
+              "### Downloads\n"
+              "Prebuilt for macOS and Windows, packaged from the tag.\n"
+              "\n"
+              "The macOS build is unsigned: open the app with a right click -> Open, or allow it\n"
+              "in System Settings -> Privacy & Security -> Open Anyway. If macOS says the app is\n"
+              "damaged, run once: `xattr -dr com.apple.quarantine PnP2PDF.app`\n"
+              "\n"
+              "### What changed since 2.0.0\n"
+          )
+          Path("release-notes.md").write_text(header + "\n" + block + "\n", encoding="utf-8")
+          PY
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.artifact }}
-          body: |
-            ### Downloads
-            Prebuilt for macOS and Windows, packaged from the tag.
-
-            macOS builds are unsigned: after unpacking, either open the app with a right click -> Open, or run once:
-            xattr -dr com.apple.quarantine PnP2PDF.app
-
-            ### Changes
-            See CHANGELOG.md in the repository.
+          body_path: release-notes.md
