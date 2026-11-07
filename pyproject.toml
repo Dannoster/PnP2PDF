@@ -16,7 +16,7 @@ Homepage = "https://github.com/Dannoster/PnP2PDF"
 pnp2pdf = "pnp2pdf.app:main"
 
 [tool.setuptools]
-packages = ["pnp2pdf"]
+packages = ["pnp2pdf", "pnp2pdf.ui"]
 
 [tool.setuptools.package-data]
 pnp2pdf = ["color_profiles/*.icc", "icon.png"]
