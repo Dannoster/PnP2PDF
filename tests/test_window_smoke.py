@@ -14,6 +14,12 @@ from pnp2pdf.settings import DEFAULT_SETTINGS
 from pnp2pdf.ui.form import FIELD_KEYS
 
 
+@pytest.fixture(autouse=True)
+def _isolated_log(log_dir):
+    """Every window test logs into tmp_path, never the real data directory."""
+    return log_dir
+
+
 @pytest.fixture
 def gui():
     handles = fake_ctk.install()
@@ -162,6 +168,22 @@ def test_build_from_the_window(gui, card_folder, tmp_path):
         window.on_close()
 
 
+def test_create_pdf_logs_the_click(gui, card_folder, tmp_path):
+    module, _ = gui
+    folder = _cards(card_folder)
+    output = tmp_path / "pdfs"
+    output.mkdir()
+    window = _window(module, folder, save_to=str(output))
+    try:
+        _pump(window, lambda: len(window._page_views) == 2)
+        window._run_button.invoke()
+
+        text = (tmp_path / module.crash.LOG_NAME).read_text(encoding="utf-8")
+        assert "click button=create" in text
+    finally:
+        window.on_close()
+
+
 def test_show_pdf_without_a_finished_build_does_nothing(gui, card_folder):
     module, _ = gui
     folder = _cards(card_folder)
@@ -213,6 +235,18 @@ def test_closing_the_window_stops_the_controller(gui, card_folder):
         assert window.destroyed is True
     finally:
         window.destroy()
+
+
+def test_closing_logs_a_single_window_close_line(gui, card_folder, tmp_path):
+    module, _ = gui
+    folder = _cards(card_folder, count=1)
+    window = _window(module, folder)
+
+    window._on_close()
+    window._close()
+
+    text = (tmp_path / module.crash.LOG_NAME).read_text(encoding="utf-8")
+    assert text.count("window-close") == 1
 
 
 def test_an_empty_folder_shows_an_invitation(gui):

@@ -278,8 +278,9 @@ written, and the build fails loudly if the signature does not verify.
 ## Troubleshooting
 
 **The packaged app quits or does nothing.** Errors that a windowed build would
-swallow are written to `crash.log`, and the error dialog names the file. Send it
-when reporting a problem.
+swallow are written to `crash.log`, and the error dialog names the file. The same
+file records what was clicked; it rotates at 320 KB, keeping one previous copy in
+`crash.log.1`. Send it when reporting a problem.
 
 - macOS: `~/Library/Application Support/PnP2PDF/crash.log`
 - Windows: `%APPDATA%\PnP2PDF\crash.log`

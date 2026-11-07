@@ -254,7 +254,8 @@ build_app.bat           # Windows
 ## 出问题时
 
 **打包后的应用一闪就退出或没有反应。** 窗口版程序平时会隐藏的错误现在会写进
-`crash.log`，错误对话框里会显示具体路径。反馈问题时请附上该文件。
+`crash.log`，错误对话框里会显示具体路径。同一个文件也会记录点击操作；它在达到
+320 KB 时轮换，并在 `crash.log.1` 中保留上一份副本。反馈问题时请附上该文件。
 
 - macOS：`~/Library/Application Support/PnP2PDF/crash.log`
 - Windows：`%APPDATA%\PnP2PDF\crash.log`

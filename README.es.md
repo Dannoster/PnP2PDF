@@ -279,7 +279,8 @@ firma de nuevo y la compilación falla con un mensaje claro si la firma no valid
 
 **La aplicación empaquetada se cierra o no hace nada.** Los errores que una
 compilación con ventana oculta se escriben en `crash.log`, y el diálogo de error
-indica la ruta. Envíalo al informar de un problema.
+indica la ruta. El mismo archivo registra lo que se pulsó; rota a los 320 KB y
+conserva una copia anterior en `crash.log.1`. Envíalo al informar de un problema.
 
 - macOS: `~/Library/Application Support/PnP2PDF/crash.log`
 - Windows: `%APPDATA%\PnP2PDF\crash.log`

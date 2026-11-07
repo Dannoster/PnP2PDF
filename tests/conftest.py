@@ -38,6 +38,15 @@ def pnp():
 
 
 @pytest.fixture
+def log_dir(tmp_path, monkeypatch):
+    """Point the crash log at ``tmp_path`` for the duration of a test."""
+    from pnp2pdf import resources
+
+    monkeypatch.setattr(resources, "data_dir", lambda *a, **k: str(tmp_path))
+    return tmp_path
+
+
+@pytest.fixture
 def card_folder(tmp_path):
     """Factory that writes PNG card images into a folder and returns it."""
 

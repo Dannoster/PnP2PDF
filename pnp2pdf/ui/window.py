@@ -9,12 +9,14 @@ import os
 import queue
 import subprocess
 import sys
+import time
 import webbrowser
 from pathlib import Path
 
 import customtkinter as ctk
 
 from pnp2pdf import __version__ as PROGRAM_VERSION
+from pnp2pdf import crash
 from pnp2pdf.crash import install_handlers, log_exception, log_message, log_path
 from pnp2pdf.errors import InputError
 from pnp2pdf.options import JobOptions
@@ -105,6 +107,7 @@ class PnP2PDFWindow(ctk.CTk):
         self._last_pdf = None
         self._entries = {}
         self._job = None
+        self._build_started = 0.0
         self._build_events = queue.Queue()
         self._preview = PreviewController()
         self._preview_pending = False
@@ -174,7 +177,7 @@ class PnP2PDFWindow(ctk.CTk):
         self._register_entry("-CHEIGHT-", initial["-CHEIGHT-"], row).pack(side="left")
         ctk.CTkLabel(row, text="mm").pack(side="left", padx=6)
         self._size_check = ctk.CTkCheckBox(cards, text="Smaller size (98%)",
-                                           command=self._schedule_preview)
+                                           command=self._toggle_size)
         self._size_check.pack(anchor="w", pady=(8, 0))
         if initial["-SIZECHECKBOX-"]:
             self._size_check.select()
@@ -192,7 +195,7 @@ class PnP2PDFWindow(ctk.CTk):
         self._labeled_number(layout, "Vertical safe zones", "-VSZONES-",
                              initial["-VSZONES-"])
         self._double_check = ctk.CTkCheckBox(layout, text="Double sided cards",
-                                             command=self._schedule_preview)
+                                             command=self._toggle_double)
         self._double_check.pack(anchor="w", pady=(8, 0))
         if initial["-DOUBLECHECKBOX-"]:
             self._double_check.select()
@@ -203,7 +206,7 @@ class PnP2PDFWindow(ctk.CTk):
 
         self._output_switch = ctk.CTkCheckBox(
             files, text="Save the PDF to a different folder",
-            command=self._toggle_output_folder)
+            command=self._toggle_output)
         self._output_switch.pack(anchor="w", pady=(8, 0))
 
         self._output_hint = ctk.CTkLabel(
@@ -244,6 +247,21 @@ class PnP2PDFWindow(ctk.CTk):
         else:
             self._output_row.pack_forget()
             self._output_hint.pack(fill="x")
+
+    def _log_toggle(self, key, variable):
+        crash.log_event("toggle", name=key, value=bool(variable.get()))
+
+    def _toggle_size(self):
+        self._log_toggle("size_check", self._size_check)
+        self._schedule_preview()
+
+    def _toggle_double(self):
+        self._log_toggle("double_check", self._double_check)
+        self._schedule_preview()
+
+    def _toggle_output(self):
+        self._log_toggle("output_switch", self._output_switch)
+        self._toggle_output_folder()
 
     def _build_bottom(self, parent):
         parent.grid_columnconfigure(0, weight=1)
@@ -341,9 +359,11 @@ class PnP2PDFWindow(ctk.CTk):
     def _choose_folder(self, key):
         from tkinter import filedialog
 
+        crash.log_event("click", button="choose-folder", row=key)
         current = self._entries[key].get()
         chosen = filedialog.askdirectory(initialdir=current or None)
         if chosen:
+            crash.log_event("folder", row=key, path=chosen)
             entry = self._entries[key]
             entry.delete(0, "end")
             entry.insert(0, chosen)
@@ -383,6 +403,7 @@ class PnP2PDFWindow(ctk.CTk):
         if result is None:
             return
         if result.error:
+            crash.log_event("preview-failed", error=result.error)
             self._clear_preview()
             self._preview_status.configure(text=result.error, text_color=_ERROR)
             return
@@ -398,6 +419,7 @@ class PnP2PDFWindow(ctk.CTk):
         self._show_page(0)
 
     def _show_pages(self, images, summary):
+        crash.log_event("preview", pages=len(images or []), summary=summary)
         self._preview_status.configure(text="", text_color=_GREY)
         self._summary.configure(text=summary)
         for button in self._thumb_buttons:
@@ -412,7 +434,7 @@ class PnP2PDFWindow(ctk.CTk):
             self._page_thumbs.append(thumb)
             button = ctk.CTkButton(self._thumbs, text="", image=thumb,
                                    width=_THUMB_WIDTH, height=_THUMB_HEIGHT,
-                                   command=lambda i=index: self._show_page(i))
+                                   command=lambda i=index: self._page_clicked(i))
             button.pack(side="left", padx=3)
             self._thumb_buttons.append(button)
         self._page_index = 0
@@ -435,7 +457,15 @@ class PnP2PDFWindow(ctk.CTk):
         self._set_nav(len(self._page_views))
 
     def _step_page(self, delta):
-        self._show_page(self._page_index + delta)
+        self._page_clicked(self._page_index + delta)
+
+    def _page_clicked(self, index):
+        if self._page_views:
+            index = max(0, min(index, len(self._page_views) - 1))
+        else:
+            index = 0
+        crash.log_event("click", button="page", index=index)
+        self._show_page(index)
 
     def _set_nav(self, count):
         state = "disabled" if count <= 1 else "normal"
@@ -445,6 +475,7 @@ class PnP2PDFWindow(ctk.CTk):
     # -- build job -------------------------------------------------------
 
     def _run(self):
+        crash.log_event("click", button="create")
         try:
             if self._job is not None and self._job.is_running():
                 return
@@ -455,6 +486,9 @@ class PnP2PDFWindow(ctk.CTk):
                 self._show_error(str(error))
                 return
 
+            crash.log_event("build-start", cards=options.cards_folder,
+                            double_sided=options.double_sided)
+            self._build_started = time.monotonic()
             self._run_button.configure(state="disabled")
             self._cancel_button.configure(state="normal")
             self._status.configure(text="")
@@ -482,12 +516,16 @@ class PnP2PDFWindow(ctk.CTk):
                     self.result = self.values()
                     self._last_pdf = self._pdf_file(payload)
                     shown = self._last_pdf.name if self._last_pdf else str(payload)
+                    crash.log_event(
+                        "build-done", pdf=self._last_pdf,
+                        seconds=round(time.monotonic() - self._build_started, 1))
                     self._finish_run(reset_progress=False)
                     self._progress.set(1)
                     self._status.configure(text=f"Saved to {shown}",
                                            text_color=_OK)
                     self._show_button.configure(state="normal")
                 elif name == "error":
+                    crash.log_event("build-failed", error=payload)
                     self._finish_run()
                     self._status.configure(text="Failed")
                     self._show_error(payload)
@@ -517,6 +555,7 @@ class PnP2PDFWindow(ctk.CTk):
         return matches[0] if matches else None
 
     def _reveal_pdf(self):
+        crash.log_event("click", button="show-pdf")
         path = self._last_pdf
         if not path or not os.path.exists(path):
             return
@@ -531,6 +570,7 @@ class PnP2PDFWindow(ctk.CTk):
             pass
 
     def _cancel(self):
+        crash.log_event("click", button="cancel")
         if self._job is not None:
             self._job.cancel()
         self._cancel_button.configure(state="disabled")
@@ -551,13 +591,18 @@ class PnP2PDFWindow(ctk.CTk):
 
     # -- life cycle ------------------------------------------------------
 
-    def _close(self):
+    def _mark_closed(self):
+        if not self._closed:
+            crash.log_event("window-close")
         self._closed = True
+
+    def _close(self):
+        self._mark_closed()
         self._preview.stop()
         self.destroy()
 
     def _on_close(self):
-        self._closed = True
+        self._mark_closed()
         self._preview.stop()
         if self._job is not None and self._job.is_running():
             self._job.cancel()

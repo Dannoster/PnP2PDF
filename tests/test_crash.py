@@ -14,12 +14,6 @@ _TIMESTAMP = re.compile(
     r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[pid \d+\] ")
 
 
-@pytest.fixture
-def log_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(resources, "data_dir", lambda *a, **k: str(tmp_path))
-    return tmp_path
-
-
 def _read(path):
     return path.read_text(encoding="utf-8")
 
@@ -56,6 +50,36 @@ def test_entries_are_appended(log_dir):
     assert len(lines) == 2
     assert lines[0].endswith("first")
     assert lines[1].endswith("second")
+
+
+def test_log_event_writes_one_line(log_dir):
+    crash.log_event("click", button="create")
+
+    lines = _read(log_dir / crash.LOG_NAME).splitlines()
+    assert len(lines) == 1
+    assert lines[0].endswith("click button=create")
+    assert _TIMESTAMP.match(lines[0])
+
+
+def test_log_event_flattens_newlines(log_dir):
+    crash.log_event("folder", path="a\nb\tc")
+
+    lines = _read(log_dir / crash.LOG_NAME).splitlines()
+    assert len(lines) == 1
+    assert lines[0].endswith("folder path=a b c")
+
+
+def test_log_rotates_at_the_size_limit(log_dir):
+    path = log_dir / crash.LOG_NAME
+    path.write_bytes(b"x" * crash.MAX_BYTES)
+
+    crash.log_event("click", button="create")
+
+    assert len(path.read_bytes()) < crash.MAX_BYTES
+    backup = log_dir / (crash.LOG_NAME + crash.BACKUP_SUFFIX)
+    assert backup.is_file()
+    assert backup.read_bytes() == b"x" * crash.MAX_BYTES
+    assert crash.log_path() == str(path)
 
 
 def test_install_handlers_returns_the_path_and_is_safe_twice(log_dir):

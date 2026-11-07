@@ -284,7 +284,9 @@ klaren Meldung ab.
 
 **Die gepackte App beendet sich oder tut nichts.** Fehler, die ein Fenster-Build
 sonst verschluckt, landen in `crash.log`, und der Fehlerdialog nennt den Pfad.
-Bitte diese Datei bei einer Meldung mitschicken.
+Dieselbe Datei protokolliert, was angeklickt wurde; sie rotiert bei 320 KB und
+behält eine vorherige Kopie in `crash.log.1`. Bitte diese Datei bei einer Meldung
+mitschicken.
 
 - macOS: `~/Library/Application Support/PnP2PDF/crash.log`
 - Windows: `%APPDATA%\PnP2PDF\crash.log`
