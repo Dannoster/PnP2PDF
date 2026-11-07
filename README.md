@@ -36,13 +36,29 @@ Download the archive for your system from
 [Releases](https://github.com/Dannoster/PnP2PDF/releases), unpack it, run it. No
 Python installation is needed.
 
-macOS builds are not signed with an Apple Developer ID, so the first launch of a
-downloaded copy needs the quarantine flag removed:
+### First launch on macOS
 
-```bash
-xattr -dr com.apple.quarantine /Applications/PnP2PDF.app
-open /Applications/PnP2PDF.app
-```
+Release builds are not signed by an Apple identity, so macOS asks for permission
+the first time. In order:
+
+1. Double-click the app. If macOS refuses, open the folder in Finder,
+   **right-click (Control-click) the app → Open → Open**. macOS remembers the
+   choice afterwards.
+2. If the dialog has no *Open* button, open **System Settings → Privacy &
+   Security**, scroll down to the note about PnP2PDF and press **Open Anyway**.
+3. If macOS says the app *is damaged and can't be opened*, remove the quarantine
+   flag once and open it again:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/PnP2PDF.app
+   open /Applications/PnP2PDF.app
+   ```
+
+### First launch on Windows
+
+An unsigned executable can trigger Defender SmartScreen: press **More info →
+Run anyway**. Nothing is wrong with the file; the warning disappears after the
+first successful launch.
 
 ## Running from source
 
@@ -280,7 +296,10 @@ ticked — see [Card folder layouts](#card-folder-layouts).
 
 **The app opens as a folder (macOS).** The bundle or the launch database is
 stale: rebuild with `./build_app.sh`, then run
-`/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f dist/PnP2PDF.app`.
+
+```
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f dist/PnP2PDF.app
+```
 
 ## Development
 
@@ -289,13 +308,13 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-The suite stubs CustomTkinter, so it runs without a display. Package layout:
+The tests replace CustomTkinter, so they run without a display. Package layout:
 
 ```
 pnp2pdf/
 ├── app.py          event loop and start-up
-├── cards.py        scanning a folder, pairing cards with backs
-├── layout.py       filling sheets
+├── cards.py        walking the folder, pairing cards with backs
+├── layout.py       placing cards on sheets
 ├── render.py       drawing a page: cards, cut lines, corners, safe zones
 ├── pdf.py          writing the CMYK PDF
 ├── preview.py      fast low-resolution rendering for the preview panel
@@ -306,11 +325,13 @@ pnp2pdf/
 
 ## Known issues
 
-- The Windows build may report an error after the window is closed; the PDF is
-  already written at that point.
-- Microsoft Defender sometimes flags PyInstaller builds as unknown software.
-- The macOS build is unsigned, hence the quarantine step above. Signing and
-  notarising need an Apple Developer ID.
+- The macOS release archive is an arm64 build, because it is produced with the
+  Python that runs the build script. On an Intel Mac, build the app yourself with
+  `./build_app.sh`.
+- Both builds are unsigned, so the system asks for permission on the first launch
+  — see [Prebuilt app](#prebuilt-app).
+- Images are stretched to the card area, so a picture with a different aspect
+  ratio than the chosen card size looks distorted.
 
 ## License
 

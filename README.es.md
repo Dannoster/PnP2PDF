@@ -36,13 +36,29 @@ Descarga el archivo de tu sistema desde
 [Releases](https://github.com/Dannoster/PnP2PDF/releases), descomprímelo y
 ejecútalo. No hace falta instalar Python.
 
-Las versiones de macOS no están firmadas con un Apple Developer ID, así que la
-primera vez hay que quitar la cuarentena:
+### Primera ejecución en macOS
 
-```bash
-xattr -dr com.apple.quarantine /Applications/PnP2PDF.app
-open /Applications/PnP2PDF.app
-```
+Las versiones publicadas no están firmadas con una identidad de Apple, así que macOS
+pide permiso la primera vez. Por orden:
+
+1. Haz doble clic en la aplicación. Si macOS no la abre, abre la carpeta en Finder,
+   **haz clic derecho (Control-clic) en la aplicación → Abrir → Abrir**. Después el
+   sistema recuerda la elección.
+2. Si el diálogo no tiene el botón *Abrir*, abre **Ajustes del Sistema → Privacidad y
+   seguridad**, baja hasta la línea de PnP2PDF y pulsa **Abrir de todos modos**.
+3. Si macOS dice que la aplicación *está dañada y no se puede abrir*, quita la
+   cuarentena una vez y vuelve a abrirla:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/PnP2PDF.app
+   open /Applications/PnP2PDF.app
+   ```
+
+### Primera ejecución en Windows
+
+Un ejecutable sin firmar puede activar Defender SmartScreen: pulsa **Más información →
+Ejecutar de todas formas**. El archivo está bien; tras el primer arranque el aviso no
+vuelve.
 
 ## Ejecutar desde el código
 
@@ -308,11 +324,13 @@ pnp2pdf/
 
 ## Problemas conocidos
 
-- La versión de Windows a veces muestra un error al cerrar la ventana; el PDF ya
-  está escrito.
-- Microsoft Defender a veces marca los programas empaquetados con PyInstaller.
-- La versión de macOS no está firmada, de ahí el paso de cuarentena. Firmar y
-  notarizar requiere un Apple Developer ID.
+- El archivo de macOS es una compilación arm64, porque se genera con el Python que
+  ejecuta el script de compilación. En un Mac con Intel, compila la aplicación tú mismo
+  con `./build_app.sh`.
+- Ninguna de las dos compilaciones está firmada, así que el sistema pide permiso en el
+  primer arranque — ver [Aplicación lista](#aplicación-lista).
+- Las imágenes se estiran al área de la carta, así que una imagen con otra proporción
+  que el tamaño elegido se ve deformada.
 
 ## Licencia
 

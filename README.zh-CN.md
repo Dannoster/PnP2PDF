@@ -32,13 +32,25 @@ PnP2PDF 把 print-and-play 卡牌图片排版成一个可以直接打印的 PDF�
 在 [Releases](https://github.com/Dannoster/PnP2PDF/releases) 下载对应系统的压缩包，
 解压后直接运行，无需安装 Python。
 
-macOS 版本没有使用 Apple Developer ID 签名，所以第一次运行下载的副本时需要去掉
-隔离属性：
+### macOS 首次启动
 
-```bash
-xattr -dr com.apple.quarantine /Applications/PnP2PDF.app
-open /Applications/PnP2PDF.app
-```
+发布版本没有 Apple 签名，所以第一次打开时系统会询问。依次尝试：
+
+1. 双击应用。如果 macOS 拒绝打开，在 Finder 中打开所在文件夹，
+   **右键（Control-点击）应用 → 打开 → 打开**。之后系统会记住这个选择。
+2. 如果对话框里没有*打开*按钮，打开**系统设置 → 隐私与安全性**，向下滚动到 PnP2PDF
+   那一行，点击**仍要打开**。
+3. 如果 macOS 提示应用*已损坏，无法打开*，先清除隔离属性再启动：
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/PnP2PDF.app
+   open /Applications/PnP2PDF.app
+   ```
+
+### Windows 首次启动
+
+未签名的可执行文件可能触发 Defender SmartScreen：点击**更多信息 → 仍要运行**。
+文件本身没有问题，第一次成功启动之后就不会再提示。
 
 ## 从源码运行
 
@@ -285,10 +297,10 @@ pnp2pdf/
 
 ## 已知问题
 
-- Windows 版本偶尔在关闭窗口后报错，此时 PDF 已经写好。
-- Microsoft Defender 有时会把 PyInstaller 打包的程序标记为未知软件。
-- macOS 版本没有签名，因此需要上面的隔离处理；签名与公证需要 Apple
-  Developer ID。
+- macOS 压缩包是 arm64 版本，因为它是由运行构建脚本的那个 Python 打包的。在 Intel Mac
+  上请自行构建：`./build_app.sh`。
+- 两个版本都没有签名，所以第一次启动时系统会询问——见[免安装版本](#免安装版本)。
+- 图片会被拉伸到卡牌区域，宽高比与所选卡牌尺寸不同的图片会显得变形。
 
 ## 许可协议
 

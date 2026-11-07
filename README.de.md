@@ -36,13 +36,29 @@ Lade das Archiv für dein System von
 [Releases](https://github.com/Dannoster/PnP2PDF/releases) herunter, entpacke es und
 starte es. Python muss nicht installiert werden.
 
-Die macOS-Builds sind nicht mit einer Apple Developer ID signiert, deshalb muss bei
-der ersten Ausführung die Quarantäne aufgehoben werden:
+### Erster Start unter macOS
 
-```bash
-xattr -dr com.apple.quarantine /Applications/PnP2PDF.app
-open /Applications/PnP2PDF.app
-```
+Die veröffentlichten Builds sind nicht mit einer Apple-Identität signiert, deshalb
+fragt macOS beim ersten Start nach. Der Reihe nach:
+
+1. Doppelklick auf die App. Wenn macOS sie nicht öffnet, öffne den Ordner im Finder,
+   **Rechtsklick (Control-Klick) auf die App → Öffnen → Öffnen**. Danach merkt sich das
+   System die Entscheidung.
+2. Hat der Dialog keinen Knopf *Öffnen*, öffne **Systemeinstellungen → Datenschutz &
+   Sicherheit**, scrolle bis zum Eintrag für PnP2PDF und drücke **Dennoch öffnen**.
+3. Meldet macOS, die App *sei beschädigt und lasse sich nicht öffnen*, entferne die
+   Quarantäne einmalig und starte sie erneut:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/PnP2PDF.app
+   open /Applications/PnP2PDF.app
+   ```
+
+### Erster Start unter Windows
+
+Eine unsignierte Datei löst manchmal Defender SmartScreen aus: **Weitere
+Informationen → Trotzdem ausführen**. Mit der Datei stimmt alles; nach dem ersten Start
+erscheint der Hinweis nicht mehr.
 
 ## Aus dem Quellcode starten
 
@@ -314,12 +330,13 @@ pnp2pdf/
 
 ## Bekannte Probleme
 
-- Der Windows-Build meldet manchmal nach dem Schließen des Fensters einen Fehler;
-  das PDF ist dann schon geschrieben.
-- Microsoft Defender meldet PyInstaller-Builds gelegentlich als unbekannte
-  Software.
-- Der macOS-Build ist unsigniert, daher der Quarantäne-Schritt. Signieren und
-  Notarisieren brauchen eine Apple Developer ID.
+- Das macOS-Archiv ist ein arm64-Build, weil es mit dem Python gebaut wird, das das
+  Build-Skript ausführt. Auf einem Intel-Mac baust du die App selbst mit
+  `./build_app.sh`.
+- Beide Builds sind unsigniert, deshalb fragt das System beim ersten Start nach —
+  siehe [Fertige App](#fertige-app).
+- Bilder werden auf die Kartenfläche gestreckt, ein Bild mit einem anderen
+  Seitenverhältnis als die gewählte Kartengröße wirkt deshalb verzerrt.
 
 ## Lizenz
 

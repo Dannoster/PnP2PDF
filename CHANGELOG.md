@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - the README explains every card folder layout with a tree, the settings and the
   command line, and warns that the "Double sided cards" box is what prints backs
 - the README is translated into Russian, Simplified Chinese, Spanish and German
+- the README explains how to let macOS and Windows open the unsigned build, and
+  the known-issues list no longer repeats fixes that already shipped
 
 ### Fixed
 - the macOS bundle is re-signed after its version is written, so it no longer reports "is damaged" on launch
