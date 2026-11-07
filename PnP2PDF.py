@@ -7,6 +7,7 @@ import webbrowser
 import json
 import re
 import datetime
+import threading
 from dataclasses import dataclass
 # pip install PySimpleGUI
 # pip install pillow
@@ -176,7 +177,7 @@ class PdfFile:
     def __init__(self, sheets: list[Sheet]):
         self.sheets = sheets
 
-    def save(self, folder: str, double_sided: bool):
+    def save(self, folder: str, double_sided: bool, progress=None, cancelled=None) -> str:
 
         stamp = datetime.datetime.today().strftime("%d%m%y_%H%M")
         outdir = os.path.join(folder, stamp)
@@ -195,8 +196,25 @@ class PdfFile:
         x0 = (swidth - (columns-1)*gap - columns*cwidth) // 2
         y0 = (sheight - (rows-1)*gap - rows*cheight) // 2
 
+        total = len(self.sheets) * (2 if double_sided else 1)
         pages = []
+        done = 0
+
+        def check_cancelled():
+            if cancelled is not None and cancelled():
+                for page in pages:
+                    page.close()
+                try:
+                    os.rmdir(outdir)
+                except OSError:
+                    pass
+                raise OperationCancelled()
+
+        if progress is not None:
+            progress(0, total, f"Page 0 of {total}")
+
         for i, sheet in enumerate(self.sheets):
+            check_cancelled()
             page_a = Image.new('CMYK',
                                (int(sheet.width*PXLS_IN_MM), int(sheet.height*PXLS_IN_MM)),
                                (0, 0, 0, 0))
@@ -221,8 +239,12 @@ class PdfFile:
                 draw_cutting_corners(x, y, draw_a, cwidth, cheight)
             draw_szones(draw_a, swidth, sheight, hszone, vszone)
             pages.append(page_a)
+            done += 1
+            if progress is not None:
+                progress(done, total, f"Page {done} of {total}")
 
             if double_sided:
+                check_cancelled()
                 page_b = Image.new('CMYK',
                                    (int(sheet.width*PXLS_IN_MM), int(sheet.height*PXLS_IN_MM)),
                                    (0, 0, 0, 0))
@@ -251,6 +273,9 @@ class PdfFile:
                                                int(card.back.width*PXLS_IN_MM),
                                                int(card.back.height*PXLS_IN_MM))
                 pages.append(page_b)
+                done += 1
+                if progress is not None:
+                    progress(done, total, f"Page {done} of {total}")
 
         pdf_path = os.path.join(outdir, f"{os.path.basename(outdir)}.pdf")
         pages[0].save(pdf_path, "PDF", optimize=False,
@@ -258,6 +283,7 @@ class PdfFile:
                       dpi=(300, 300), compression=None, quality=100)
         for page in pages:
             page.close()
+        return outdir
 
 
 def load_save(path: str) -> dict:
@@ -394,6 +420,29 @@ def create_sheets(cards: list[Card|CardBack], sheet_width: float, sheet_height: 
 
     
 
+class OperationCancelled(Exception):
+    """Raised when the user cancels a running build."""
+
+
+def build_pdf(values: dict, progress=None, cancelled=None) -> str:
+    cards = create_cards(values['-CFOLDER-'],
+                         float(values['-CWIDTH-'].replace(',', '.')),
+                         float(values['-CHEIGHT-'].replace(',', '.')),
+                         values["-SIZECHECKBOX-"],
+                         values['-DOUBLECHECKBOX-'])
+    sheets = create_sheets(cards,
+                           float(values['-PWIDTH-'].replace(',', '.')),
+                           float(values['-PHEIGHT-'].replace(',', '.')),
+                           int(values['-ROWS-']),
+                           int(values['-COLUMNS-']),
+                           float(values['-GAP-'].replace(',', '.')),
+                           float(values['-HSZONES-'].replace(',', '.')),
+                           float(values['-VSZONES-'].replace(',', '.')))
+    pdf = PdfFile(sheets)
+    return pdf.save(values['-PDFFOLDER-'], values['-DOUBLECHECKBOX-'],
+                    progress=progress, cancelled=cancelled)
+
+
 def ui_window(settings: dict):
     form_rows = [
                  [sg.Text('Paper size', size=(14, 1)), 
@@ -437,42 +486,78 @@ def ui_window(settings: dict):
                   sg.InputText(f"{settings['save_to']}", key='-PDFFOLDER-'), 
                   sg.FolderBrowse(initial_folder=settings['save_to'])],
 
-                 [sg.Submit("Create PDF", size=(14, 1)), sg.Push(), sg.Text(f"v{PROGRAM_VERSION}")]
+                 [sg.ProgressBar(1000, orientation="h", size=(20, 20), key="-PROGRESS-")],
+                 [sg.Text("", size=(40, 1), key="-STATUS-")],
+                 [sg.Button("Create PDF", key="-RUN-", size=(14, 1)),
+                  sg.Button("Cancel", key="-CANCEL-", disabled=True),
+                  sg.Push(), sg.Text(f"v{PROGRAM_VERSION}")]
                 ]
 
     window = sg.Window('PnP2PDF', form_rows, icon="icon.png")
 
+    cancel_event = threading.Event()
+    worker = None
+    job_values = {}
+
     while True:
-        event, values = window.read()
+        event, values = window.read(timeout=100)
+        if event is None:
+            continue
         if event == sg.WINDOW_CLOSED:
+            if worker is not None and worker.is_alive():
+                cancel_event.set()
+                worker.join(timeout=5)
             return "Window closed"
         elif event.startswith("URL "):
             url = event.split(' ')[1]
             webbrowser.open(url)
-        elif event.startswith("Create PDF"):
-            try:
-                cards = create_cards(values['-CFOLDER-'], 
-                                     float(values['-CWIDTH-'].replace(',','.')), 
-                                     float(values['-CHEIGHT-'].replace(',','.')),
-                                     values["-SIZECHECKBOX-"],
-                                     values['-DOUBLECHECKBOX-'])
-                sheets = create_sheets(cards, 
-                                       float(values['-PWIDTH-'].replace(',','.')), 
-                                       float(values['-PHEIGHT-'].replace(',','.')), 
-                                       int(values['-ROWS-']), 
-                                       int(values['-COLUMNS-']), 
-                                       float(values['-GAP-'].replace(',','.')), 
-                                       float(values['-HSZONES-'].replace(',','.')), 
-                                       float(values['-VSZONES-'].replace(',','.')))
-                pdf = PdfFile(sheets)
-                pdf.save(values['-PDFFOLDER-'], values['-DOUBLECHECKBOX-'])
-                window.close()
-                return values
-            except Exception as error:
-                sg.popup_error(f"Could not create the PDF:\n\n{error}")
+        elif event == "-RUN-":
+            if worker is not None and worker.is_alive():
                 continue
-            
-        
+            cancel_event.clear()
+            window["-RUN-"].update(disabled=True)
+            window["-CANCEL-"].update(disabled=False)
+            window["-STATUS-"].update("")
+            window["-PROGRESS-"].update(0)
+            job_values = dict(values)
+
+            def run_job(job_values):
+                try:
+                    folder = build_pdf(
+                        job_values,
+                        progress=lambda done, total, text: window.write_event_value(
+                            "-PROGRESS-", (done, total, text)),
+                        cancelled=cancel_event.is_set)
+                    window.write_event_value("-DONE-", folder)
+                except OperationCancelled:
+                    window.write_event_value("-CANCELLED-", None)
+                except Exception as error:
+                    window.write_event_value("-ERROR-", str(error))
+
+            worker = threading.Thread(target=run_job, args=(job_values,), daemon=True)
+            worker.start()
+        elif event == "-PROGRESS-":
+            done, total, text = values["-PROGRESS-"]
+            window["-PROGRESS-"].update(done * 1000 // max(total, 1))
+            window["-STATUS-"].update(text)
+        elif event == "-DONE-":
+            window.close()
+            return job_values
+        elif event == "-ERROR-":
+            sg.popup_error(f"Could not create the PDF:\n\n{values['-ERROR-']}")
+            window["-RUN-"].update(disabled=False)
+            window["-CANCEL-"].update(disabled=True)
+            window["-STATUS-"].update("Failed")
+        elif event == "-CANCELLED-":
+            window["-RUN-"].update(disabled=False)
+            window["-CANCEL-"].update(disabled=True)
+            window["-PROGRESS-"].update(0)
+            window["-STATUS-"].update("Cancelled")
+        elif event == "-CANCEL-":
+            cancel_event.set()
+            window["-CANCEL-"].update(disabled=True)
+            window["-STATUS-"].update("Cancelling…")
+
         
 def main():
     save_folder = os.path.join(curr_path, "presets.json")

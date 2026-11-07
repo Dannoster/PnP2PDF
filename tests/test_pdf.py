@@ -2,6 +2,7 @@ import io
 import re
 from pathlib import Path
 
+import pytest
 from PIL import Image, ImageStat
 
 
@@ -112,3 +113,32 @@ def test_double_sided_alternates_front_and_back(pnp, tmp_path):
     assert (magentas[0] - midpoint) * (magentas[2] - midpoint) > 0
     assert (magentas[1] - midpoint) * (magentas[3] - midpoint) > 0
     assert (magentas[0] - midpoint) * (magentas[1] - midpoint) < 0
+
+
+def test_progress_is_reported_for_every_page(pnp, tmp_path):
+    cards = _make_cards(pnp, tmp_path / "cards")
+    sheets = pnp.create_sheets(cards, 210, 297, 2, 2, 3, 5, 5)
+    out_dir = tmp_path / "out"
+    seen = []
+
+    def collector(done, total, text):
+        seen.append((done, total))
+
+    pnp.PdfFile(sheets).save(str(out_dir), False, progress=collector)
+
+    dones = [done for done, _ in seen]
+    totals = {total for _, total in seen}
+    assert dones == list(range(len(sheets) + 1))
+    assert totals == {len(sheets)}
+
+
+def test_cancel_stops_the_job(pnp, tmp_path):
+    cards = _make_cards(pnp, tmp_path / "cards")
+    sheets = pnp.create_sheets(cards, 210, 297, 2, 2, 3, 5, 5)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+
+    with pytest.raises(pnp.OperationCancelled):
+        pnp.PdfFile(sheets).save(str(out_dir), False, cancelled=lambda: True)
+
+    assert not list(Path(out_dir).rglob("*.pdf"))
