@@ -7,13 +7,14 @@ import webbrowser
 import json
 import re
 import datetime
+from dataclasses import dataclass
 # pip install PySimpleGUI
 # pip install pillow
 import PySimpleGUI as sg
 from PIL import Image, ImageDraw, ImageCms
 
 PROGRAM_VERSION = "2.0.2"
-PXLS_IN_MM = 11.81102362204 # needed changes
+PXLS_IN_MM = 11.81102362204 # pixels per millimetre at 300 dpi
 DEFAULT_SETTINGS = {"paper_width"   : 210,
             "paper_height"  : 297,
             "card_width"    : 62.5,
@@ -41,6 +42,7 @@ def icc_profile(name: str) -> str:
     """Absolute path to a bundled ICC profile (works regardless of CWD)."""
     return os.path.join(ICC_DIR, name)
 
+
 class CardBack:
     def __init__(self, dir: str, width: float, height: float):
         """
@@ -50,34 +52,36 @@ class CardBack:
         self.width = width
         self.height = height
 
-class Card(CardBack):
-    """
-    Card class
-    """    
-    def __init__(self, dir: str, width: float, height: float, back: CardBack = None):
-        super().__init__(dir, width, height)
-        self.back = back
+    def __repr__(self):
+        return f"CardBack({self.dir!r}, {self.width}x{self.height})"
 
 
-class Sheet:
-    def __init__(self, width: float, height: float, 
-                 rows: int, columns: int, gap: int, 
-                 ud_szone: int, lr_szone: int, 
-                 cards: list[Card|CardBack]):
-        """
-        'width', 'height', 'gap', 'ud_szone', 'lr_szone' in mm
-        """ 
+class Card:
+    """A printable card face, optionally with a back side."""
+    def __init__(self, dir: str, width: float, height: int | float, back=None):
+        self.dir = dir
         self.width = width
         self.height = height
+        self.back = back
 
-        self.rows = rows
-        self.columns = columns
-        self.gap = gap
+    def __repr__(self):
+        return f"Card({self.dir!r}, {self.width}x{self.height}, back={self.back!r})"
 
-        self.ud_szone = ud_szone
-        self.lr_szone = lr_szone
 
-        self.cards = cards
+@dataclass
+class Sheet:
+    """
+    'width', 'height', 'gap', 'ud_szone', 'lr_szone' in mm
+    """ 
+    width: float
+    height: float
+    rows: int
+    columns: int
+    gap: float
+    ud_szone: float
+    lr_szone: float
+    cards: list[Card|CardBack]
+
 
 def draw_lines(draw: ImageDraw, paper_width, paper_height, 
                rows, columns, gap, card_width, card_height, number_of_cards):
@@ -166,8 +170,9 @@ def place_cropped_back(x: int, y: int, sheet: Image, image: Image, gap,
     image = image.crop((cropped_w,cropped_h,
                         back_width - cropped_w,back_height - cropped_h))
     sheet.paste(image, (x - gap//2 - 1, y - gap//2 - 1))
-    
-class PDF_file:
+
+
+class PdfFile:
     def __init__(self, sheets: list[Sheet]):
         self.sheets = sheets
 
@@ -253,11 +258,6 @@ class PDF_file:
                       dpi=(300, 300), compression=None, quality=100)
         for page in pages:
             page.close()
-
-            
-            
-
-
 
 
 def load_save(path: str) -> dict:
@@ -464,7 +464,7 @@ def ui_window(settings: dict):
                                        float(values['-GAP-'].replace(',','.')), 
                                        float(values['-HSZONES-'].replace(',','.')), 
                                        float(values['-VSZONES-'].replace(',','.')))
-                pdf = PDF_file(sheets)
+                pdf = PdfFile(sheets)
                 pdf.save(values['-PDFFOLDER-'], values['-DOUBLECHECKBOX-'])
                 window.close()
                 return values

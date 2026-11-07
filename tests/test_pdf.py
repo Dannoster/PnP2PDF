@@ -48,7 +48,7 @@ def test_save_writes_single_pdf(pnp, tmp_path):
     sheets = pnp.create_sheets(cards, 210, 297, 2, 2, 3, 5, 5)
     out_dir = tmp_path / "out"
 
-    pnp.PDF_file(sheets).save(str(out_dir), double_sided=False)
+    pnp.PdfFile(sheets).save(str(out_dir), double_sided=False)
 
     subfolders = [d for d in out_dir.iterdir() if d.is_dir()]
     assert len(subfolders) == 1
@@ -63,7 +63,7 @@ def test_repeated_save_uses_distinct_folders(pnp, tmp_path):
 
     for _ in range(2):
         sheets = pnp.create_sheets(cards, 210, 297, 2, 2, 3, 5, 5)
-        pnp.PDF_file(sheets).save(str(out_dir), double_sided=False)
+        pnp.PdfFile(sheets).save(str(out_dir), double_sided=False)
 
     subfolders = sorted(d for d in out_dir.iterdir() if d.is_dir())
     assert len(subfolders) == 2
@@ -76,13 +76,13 @@ def test_page_count_matches_sheets(pnp, tmp_path):
     cards = _make_cards(pnp, tmp_path / "cards")
     out_dir = tmp_path / "single"
     sheets = pnp.create_sheets(cards, 210, 297, 2, 2, 3, 5, 5)
-    pnp.PDF_file(sheets).save(str(out_dir), double_sided=False)
+    pnp.PdfFile(sheets).save(str(out_dir), double_sided=False)
     assert _page_count(_pdf_in(out_dir)) == len(sheets)
 
     back_cards = _make_cards(pnp, tmp_path / "cards2", with_backs=True)
     double_dir = tmp_path / "double"
     double_sheets = pnp.create_sheets(back_cards, 210, 297, 2, 2, 3, 5, 5)
-    pnp.PDF_file(double_sheets).save(str(double_dir), double_sided=True)
+    pnp.PdfFile(double_sheets).save(str(double_dir), double_sided=True)
     assert _page_count(_pdf_in(double_dir)) == 2 * len(double_sheets)
 
 
@@ -91,7 +91,7 @@ def test_pages_are_cmyk(pnp, tmp_path):
     sheets = pnp.create_sheets(cards, 210, 297, 2, 2, 3, 5, 5)
     out_dir = tmp_path / "out"
 
-    pnp.PDF_file(sheets).save(str(out_dir), double_sided=False)
+    pnp.PdfFile(sheets).save(str(out_dir), double_sided=False)
 
     data = _pdf_in(out_dir).read_bytes()
     assert b"/DeviceCMYK" in data
@@ -104,7 +104,7 @@ def test_double_sided_alternates_front_and_back(pnp, tmp_path):
     assert len(sheets) == 2
     out_dir = tmp_path / "out"
 
-    pnp.PDF_file(sheets).save(str(out_dir), double_sided=True)
+    pnp.PdfFile(sheets).save(str(out_dir), double_sided=True)
 
     magentas = _jpeg_magentas(_pdf_in(out_dir))
     assert len(magentas) == 4
