@@ -142,13 +142,37 @@ def test_build_from_the_window(gui, card_folder, tmp_path):
         _pump(window, lambda: len(window._page_views) == 2)
         window._run_button.invoke()
 
-        _pump(window, lambda: window.destroyed, timeout=20.0,
+        _pump(window, lambda: window._last_pdf, timeout=20.0,
               what="the build to finish")
 
+        assert window.destroyed is False
+        assert window._progress.value == 1
+        assert window._status.text
+        assert window._last_pdf.suffix == ".pdf"
+        assert window._last_pdf.exists()
+        assert window._last_pdf.name in window._status.text
+        assert window._show_button.state == "normal"
+        assert window._run_button.state == "normal"
+        assert window._cancel_button.state == "disabled"
         assert isinstance(window.result, dict)
         for key in FIELD_KEYS:
             assert key in window.result
         assert list(output.rglob("*.pdf")), "no PDF was written"
+    finally:
+        window.on_close()
+
+
+def test_show_pdf_without_a_finished_build_does_nothing(gui, card_folder):
+    module, _ = gui
+    folder = _cards(card_folder)
+    window = _window(module, folder)
+    try:
+        assert window._last_pdf is None
+        assert window._show_button.state == "disabled"
+
+        window._reveal_pdf()
+
+        assert window.destroyed is False
     finally:
         window.destroy()
 
@@ -298,5 +322,25 @@ def test_files_section_names_both_folders(gui, card_folder):
             "placeholder_text") == "Where the card images are"
         assert window._entries["-PDFFOLDER-"].cget(
             "placeholder_text") == "Folder for the PDF"
+    finally:
+        window.destroy()
+
+
+def test_pdf_file_picks_the_pdf(gui, tmp_path):
+    module, _ = gui
+    window = _window(module, None)
+    try:
+        folder = tmp_path / "out"
+        folder.mkdir()
+        pdf = folder / "cards.pdf"
+        pdf.write_bytes(b"%PDF-1.4")
+
+        assert window._pdf_file(folder) == pdf
+
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        assert window._pdf_file(empty) is None
+
+        assert window._pdf_file(pdf) == pdf
     finally:
         window.destroy()

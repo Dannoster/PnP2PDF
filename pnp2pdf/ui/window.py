@@ -5,9 +5,12 @@ on machines without Tk, so it must not touch ``tkinter`` at import time. Every
 ``tkinter`` use (file dialogs, message boxes) happens inside a method.
 """
 
+import os
 import queue
+import subprocess
 import sys
 import webbrowser
+from pathlib import Path
 
 import customtkinter as ctk
 
@@ -46,6 +49,7 @@ _THUMB_HEIGHT = 88
 
 _GREY = ("gray40", "gray70")
 _ERROR = ("#b23a2e", "#e06c5a")
+_OK = ("#1f7a3d", "#3fb56a")
 
 _FOLDER_CAPTIONS = {
     "-CFOLDER-": "Cards folder",
@@ -98,6 +102,7 @@ class PnP2PDFWindow(ctk.CTk):
 
         self.result = "Window closed"
         self._closed = False
+        self._last_pdf = None
         self._entries = {}
         self._job = None
         self._build_events = queue.Queue()
@@ -248,7 +253,7 @@ class PnP2PDFWindow(ctk.CTk):
 
         self._progress = ctk.CTkProgressBar(bar, height=8)
         self._progress.set(0)
-        self._progress.grid(row=0, column=0, columnspan=4, sticky="ew",
+        self._progress.grid(row=0, column=0, columnspan=5, sticky="ew",
                             padx=12, pady=(12, 4))
 
         self._status = ctk.CTkLabel(bar, text="", anchor="w", text_color=_GREY)
@@ -262,9 +267,13 @@ class PnP2PDFWindow(ctk.CTk):
             bar, text="Cancel", width=90, state="disabled",
             command=self._cancel)
         self._cancel_button.grid(row=1, column=2, padx=6, pady=(0, 12))
+        self._show_button = ctk.CTkButton(
+            bar, text="Show PDF", width=100, state="disabled",
+            command=self._reveal_pdf)
+        self._show_button.grid(row=1, column=3, padx=6, pady=(0, 12))
 
         links = ctk.CTkFrame(bar, fg_color="transparent")
-        links.grid(row=1, column=3, sticky="e", padx=12, pady=(0, 12))
+        links.grid(row=1, column=4, sticky="e", padx=12, pady=(0, 12))
         self._link(links, "Contact", CONTACT_URL)
         self._link(links, "Double-sided guide", GUIDE_URL)
         ctk.CTkLabel(links, text=f"v{PROGRAM_VERSION}").pack(
@@ -471,7 +480,13 @@ class PnP2PDFWindow(ctk.CTk):
                     self._status.configure(text=text)
                 elif name == "done":
                     self.result = self.values()
-                    self._close()
+                    self._last_pdf = self._pdf_file(payload)
+                    shown = self._last_pdf.name if self._last_pdf else str(payload)
+                    self._finish_run(reset_progress=False)
+                    self._progress.set(1)
+                    self._status.configure(text=f"Saved to {shown}",
+                                           text_color=_OK)
+                    self._show_button.configure(state="normal")
                 elif name == "error":
                     self._finish_run()
                     self._status.configure(text="Failed")
@@ -488,10 +503,32 @@ class PnP2PDFWindow(ctk.CTk):
         self._status.configure(text=f"Failed — details were written to {path}")
         return path
 
-    def _finish_run(self):
+    def _finish_run(self, reset_progress=True):
         self._run_button.configure(state="normal")
         self._cancel_button.configure(state="disabled")
-        self._progress.set(0)
+        if reset_progress:
+            self._progress.set(0)
+
+    def _pdf_file(self, folder):
+        path = Path(folder)
+        if path.is_file():
+            return path
+        matches = sorted(path.glob("*.pdf")) or sorted(path.glob("*/*.pdf"))
+        return matches[0] if matches else None
+
+    def _reveal_pdf(self):
+        path = self._last_pdf
+        if not path or not os.path.exists(path):
+            return
+        try:
+            if sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", str(path)])
+            elif os.name == "nt":
+                subprocess.Popen(["explorer", "/select,", str(path)])
+            else:
+                subprocess.Popen(["xdg-open", os.path.dirname(str(path))])
+        except OSError:
+            pass
 
     def _cancel(self):
         if self._job is not None:

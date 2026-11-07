@@ -231,6 +231,10 @@ class CTkProgressBar(_Widget):
         super().__init__(master, **kwargs)
         self._value = 0
 
+    @property
+    def value(self):
+        return self._value
+
     def set(self, value):
         self._value = value
 
