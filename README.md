@@ -26,8 +26,7 @@ usable as a library-ish package: the core modules (`model`, `cards`, `layout`,
 
 Prebuilt downloads:
 
-- [MacOS Version](https://drive.google.com/drive/folders/1fADjKJbXosjtHfRhAyEQ-Opt4FbnRdQ7?usp=sharing)
-- [Windows Version](https://drive.google.com/drive/folders/1BOEETxM4q-EuxWY9ZJXSHYg7T8a1HAd-?usp=sharing)
+- [Prebuilt releases](https://github.com/Dannoster/PnP2PDF/releases) for macOS and Windows
 
 Or install the dependencies by hand:
 

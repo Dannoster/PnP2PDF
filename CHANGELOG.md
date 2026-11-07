@@ -4,18 +4,13 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## Unreleased
-
-### Changed
-
-* Dependencies now require Pillow 13, PySimpleGUI 6.4, pytest 9.2 and
-  PyInstaller 6.22; Python 3.10 is no longer supported (Pillow 13 needs 3.11).
-
 ## [3.0.0] - 2026-11-07
 
 ### Added
 - pytest suite with GUI stubs
-- GitHub Actions on Linux/macOS/Windows for Python 3.10-3.12
+- GitHub Actions on Linux/macOS/Windows for Python 3.11-3.13
+- GitHub Actions release workflow: pushing a `v*` tag publishes macOS and Windows builds to GitHub Releases
+- `build_app.sh` / `build_app.bat` build the bundle from a working copy in one command
 - MIT licence
 - `pnp2pdf-cli` command line
 - progress indicator and a Cancel button
@@ -26,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - settings live in the platform data directory (`~/Library/Application Support/PnP2PDF` on macOS, `%APPDATA%` on Windows) instead of next to the code
 - settings are `presets.json` instead of a pickle
 - PDF pages are assembled in memory
+- dependencies require Pillow 13, PySimpleGUI 6.4, pytest 9.2 and PyInstaller 6.22; Python 3.10 is no longer supported (Pillow 13 needs 3.11)
 
 ### Fixed
 - empty or wrong cards folder now reports which extensions are accepted instead of crashing

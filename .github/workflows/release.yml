@@ -1,0 +1,63 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: PnP2PDF-macos.zip
+          - os: windows-latest
+            artifact: PnP2PDF-windows-x64.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: build_app.bat --no-tests
+
+      - name: Build (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: ./build_app.sh
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: ditto -c -v -k --sequesterRsrc --keepParent dist/PnP2PDF.app "${{ matrix.artifact }}"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist\PnP2PDF\* -DestinationPath "${{ matrix.artifact }}"
+
+      - name: Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact }}
+          body: |
+            ### Downloads
+            Prebuilt for macOS and Windows, packaged from the tag.
+
+            macOS builds are unsigned: after unpacking, either open the app with a right click -> Open, or run once:
+            xattr -dr com.apple.quarantine PnP2PDF.app
+
+            ### Changes
+            See CHANGELOG.md in the repository.
