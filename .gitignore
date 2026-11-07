@@ -1,9 +1,12 @@
 dist/
 build/
-/PnP2PDF.spec
+*.spec
+.venv/
 /presets.json
 /.DS_Store
 color_profiles/.DS_Store
 __pycache__/
 .pytest_cache/
 *.pyc
+
+*.egg-info/

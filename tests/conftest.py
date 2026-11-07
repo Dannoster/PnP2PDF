@@ -22,9 +22,9 @@ if "PySimpleGUI" not in sys.modules:
 
 @pytest.fixture(scope="session")
 def pnp():
-    import PnP2PDF
+    from pnp2pdf import app as pnp_module
 
-    return PnP2PDF
+    return pnp_module
 
 
 @pytest.fixture
