@@ -126,6 +126,48 @@ repair_imports() {
     check_imports
 }
 
+verify_macos_bundle() {
+    APP="dist/PnP2PDF.app"
+    if [ ! -d "$APP" ]; then
+        echo "Error: PyInstaller did not produce $APP (see the build output above)." >&2
+        exit 1
+    fi
+    PLIST="$APP/Contents/Info.plist"
+    if [ ! -f "$PLIST" ]; then
+        echo "Error: $PLIST is missing, so macOS treats the bundle as a folder." >&2
+        exit 1
+    fi
+    if ! plutil -lint "$PLIST" >/dev/null 2>&1; then
+        echo "Error: $PLIST is not a valid property list." >&2
+        exit 1
+    fi
+
+    # CFBundlePackageType must be APPL or Finder opens the bundle as a folder.
+    package_type="$(plutil -extract CFBundlePackageType raw -o - "$PLIST" 2>/dev/null || true)"
+    if [ "$package_type" != "APPL" ]; then
+        echo "==> Setting CFBundlePackageType to APPL"
+        plutil -replace CFBundlePackageType -string APPL "$PLIST"
+    fi
+
+    executable="$(plutil -extract CFBundleExecutable raw -o - "$PLIST" 2>/dev/null || true)"
+    if [ -z "$executable" ]; then
+        executable="PnP2PDF"
+        echo "==> Setting CFBundleExecutable to $executable"
+        plutil -replace CFBundleExecutable -string "$executable" "$PLIST"
+    fi
+
+    binary="$APP/Contents/MacOS/$executable"
+    if [ ! -f "$binary" ]; then
+        echo "Error: $binary is missing; the bundle has no program to launch." >&2
+        exit 1
+    fi
+    if [ ! -x "$binary" ]; then
+        echo "==> Making $binary executable"
+        chmod +x "$binary"
+    fi
+    echo "==> Bundle structure is valid"
+}
+
 rebuild=0
 venv_is_usable || rebuild=1
 venv_arch_matches_host || rebuild=1
@@ -195,6 +237,7 @@ echo "==> Running PyInstaller"
 "$(venv_python)" -m PyInstaller "${PYINSTALLER_ARGS[@]}" PnP2PDF.py
 
 if [ "$(uname -s)" = "Darwin" ]; then
+    verify_macos_bundle
     echo "==> Setting the bundle version from pyproject.toml"
     VERSION="$("$PY" -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
     plutil -replace CFBundleShortVersionString -string "$VERSION" \
@@ -211,7 +254,8 @@ if [ "$(uname -s)" = "Darwin" ]; then
     echo "    The app is ad-hoc signed. A browser-downloaded copy needs"
     echo "    xattr -dr com.apple.quarantine /Applications/PnP2PDF.app"
     echo "    before the first launch."
-    echo "    Launch it with: open dist/PnP2PDF.app"
+    echo "    Finder may still need a moment to recognise a rebuilt bundle;"
+    echo "    \`open dist/PnP2PDF.app\` is the reliable way to launch it."
 else
     echo "==> Built dist/PnP2PDF/PnP2PDF"
 fi
